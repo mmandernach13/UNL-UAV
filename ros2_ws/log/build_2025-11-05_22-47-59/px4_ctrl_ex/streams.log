@@ -1,0 +1,22 @@
+[1.723s] Invoking command in '/home/uav/uav/ros2_ws/src/px4_ctrl_ex': AMENT_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/uav/uav/ros2_ws/build/px4_ctrl_ex/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages:/home/uav/uav/ros2_ws/install/px4_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/px4_ctrl_ex build --build-base /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build install --record /home/uav/uav/ros2_ws/build/px4_ctrl_ex/install.log --single-version-externally-managed install_data
+[2.415s] running egg_info
+[2.416s] writing ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/PKG-INFO
+[2.417s] writing dependency_links to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/dependency_links.txt
+[2.418s] writing entry points to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/entry_points.txt
+[2.418s] writing requirements to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/requires.txt
+[2.419s] writing top-level names to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/top_level.txt
+[2.423s] reading manifest file '../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/SOURCES.txt'
+[2.426s] writing manifest file '../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/SOURCES.txt'
+[2.426s] running build
+[2.426s] running build_py
+[2.427s] running install
+[2.428s] running install_lib
+[2.431s] running install_data
+[2.431s] running install_egg_info
+[2.436s] removing '/home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex-0.0.0-py3.10.egg-info' (and everything under it)
+[2.437s] Copying ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex-0.0.0-py3.10.egg-info
+[2.439s] running install_scripts
+[2.487s] Installing keyboard_gz_ctrl script to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/px4_ctrl_ex
+[2.488s] Installing px4_motion_ctrl script to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/px4_ctrl_ex
+[2.488s] writing list of installed files to '/home/uav/uav/ros2_ws/build/px4_ctrl_ex/install.log'
+[2.577s] Invoked command in '/home/uav/uav/ros2_ws/src/px4_ctrl_ex' returned '0': AMENT_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/uav/uav/ros2_ws/build/px4_ctrl_ex/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages:/home/uav/uav/ros2_ws/install/px4_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/px4_ctrl_ex build --build-base /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build install --record /home/uav/uav/ros2_ws/build/px4_ctrl_ex/install.log --single-version-externally-managed install_data

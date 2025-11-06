@@ -1,0 +1,26 @@
+running egg_info
+writing ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/PKG-INFO
+writing dependency_links to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/dependency_links.txt
+writing entry points to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/entry_points.txt
+writing requirements to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/requires.txt
+writing top-level names to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/top_level.txt
+reading manifest file '../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/SOURCES.txt'
+writing manifest file '../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/SOURCES.txt'
+running build
+running build_py
+copying px4_ctrl_ex/tmp.py -> /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex
+copying px4_ctrl_ex/keyboard_gz_ctrl.py -> /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex
+running install
+running install_lib
+copying /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex/tmp.py -> /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex
+copying /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex/keyboard_gz_ctrl.py -> /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex
+byte-compiling /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex/tmp.py to tmp.cpython-310.pyc
+byte-compiling /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex/keyboard_gz_ctrl.py to keyboard_gz_ctrl.cpython-310.pyc
+running install_data
+running install_egg_info
+removing '/home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex-0.0.0-py3.10.egg-info' (and everything under it)
+Copying ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex-0.0.0-py3.10.egg-info
+running install_scripts
+Installing keyboard_gz_ctrl script to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/px4_ctrl_ex
+Installing px4_motion_ctrl script to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/px4_ctrl_ex
+writing list of installed files to '/home/uav/uav/ros2_ws/build/px4_ctrl_ex/install.log'

@@ -1,0 +1,4 @@
+[console_scripts]
+keyboard_gz_ctrl = px4_ctrl_ex.keyboard_gz_ctrl:main
+px4_motion_ctrl = px4_ctrl_ex.px4_motion_ctrl:main
+

@@ -1,0 +1,37 @@
+[1.869s] Invoking command in '/home/uav/uav/ros2_ws/src/px4_ctrl_ex': AMENT_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/uav/uav/ros2_ws/build/px4_ctrl_ex/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages:/home/uav/uav/ros2_ws/install/px4_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/px4_ctrl_ex build --build-base /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build install --record /home/uav/uav/ros2_ws/build/px4_ctrl_ex/install.log --single-version-externally-managed install_data
+[2.511s] running egg_info
+[2.512s] creating ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info
+[2.513s] writing ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/PKG-INFO
+[2.514s] writing dependency_links to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/dependency_links.txt
+[2.514s] writing entry points to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/entry_points.txt
+[2.514s] writing requirements to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/requires.txt
+[2.514s] writing top-level names to ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/top_level.txt
+[2.515s] writing manifest file '../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/SOURCES.txt'
+[2.519s] reading manifest file '../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/SOURCES.txt'
+[2.521s] writing manifest file '../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info/SOURCES.txt'
+[2.521s] running build
+[2.521s] running build_py
+[2.522s] creating /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build
+[2.522s] creating /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib
+[2.522s] creating /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex
+[2.522s] copying px4_ctrl_ex/px4_motion_ctrl.py -> /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex
+[2.523s] copying px4_ctrl_ex/__init__.py -> /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex
+[2.523s] running install
+[2.524s] running install_lib
+[2.525s] creating /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex
+[2.526s] copying /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex/px4_motion_ctrl.py -> /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex
+[2.526s] copying /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build/lib/px4_ctrl_ex/__init__.py -> /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex
+[2.527s] byte-compiling /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex/px4_motion_ctrl.py to px4_motion_ctrl.cpython-310.pyc
+[2.531s] byte-compiling /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex/__init__.py to __init__.cpython-310.pyc
+[2.531s] running install_data
+[2.531s] creating /home/uav/uav/ros2_ws/install/px4_ctrl_ex/share/ament_index
+[2.531s] creating /home/uav/uav/ros2_ws/install/px4_ctrl_ex/share/ament_index/resource_index
+[2.532s] creating /home/uav/uav/ros2_ws/install/px4_ctrl_ex/share/ament_index/resource_index/packages
+[2.532s] copying resource/px4_ctrl_ex -> /home/uav/uav/ros2_ws/install/px4_ctrl_ex/share/ament_index/resource_index/packages
+[2.532s] copying package.xml -> /home/uav/uav/ros2_ws/install/px4_ctrl_ex/share/px4_ctrl_ex
+[2.532s] running install_egg_info
+[2.537s] Copying ../../build/px4_ctrl_ex/px4_ctrl_ex.egg-info to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages/px4_ctrl_ex-0.0.0-py3.10.egg-info
+[2.539s] running install_scripts
+[2.591s] Installing px4_motion_ctrl script to /home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/px4_ctrl_ex
+[2.592s] writing list of installed files to '/home/uav/uav/ros2_ws/build/px4_ctrl_ex/install.log'
+[2.714s] Invoked command in '/home/uav/uav/ros2_ws/src/px4_ctrl_ex' returned '0': AMENT_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/uav/uav/ros2_ws/build/px4_ctrl_ex/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/uav/uav/ros2_ws/install/px4_ctrl_ex/lib/python3.10/site-packages:/home/uav/uav/ros2_ws/install/px4_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/px4_ctrl_ex build --build-base /home/uav/uav/ros2_ws/build/px4_ctrl_ex/build install --record /home/uav/uav/ros2_ws/build/px4_ctrl_ex/install.log --single-version-externally-managed install_data

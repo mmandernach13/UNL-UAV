@@ -1,0 +1,53 @@
+[  0%] Built target ament_cmake_python_copy_px4_msgs
+[  0%] Built target px4_msgs__cpp
+[ 12%] Built target px4_msgs__rosidl_generator_c
+[35m[1mConsolidate compiler generated dependencies of target px4_msgs__rosidl_typesupport_cpp[0m
+[35m[1mConsolidate compiler generated dependencies of target px4_msgs__rosidl_typesupport_introspection_cpp[0m
+[35m[1mConsolidate compiler generated dependencies of target px4_msgs__rosidl_typesupport_fastrtps_cpp[0m
+[35m[1mConsolidate compiler generated dependencies of target px4_msgs__rosidl_typesupport_introspection_c[0m
+[35m[1mConsolidate compiler generated dependencies of target px4_msgs__rosidl_typesupport_fastrtps_c[0m
+[ 25%] Built target px4_msgs__rosidl_typesupport_introspection_c
+[ 26%] [34m[1mGenerating C type support dispatch for ROS interfaces[0m
+[ 39%] Built target px4_msgs__rosidl_typesupport_introspection_cpp
+[ 51%] Built target px4_msgs__rosidl_typesupport_cpp
+[ 63%] Built target px4_msgs__rosidl_typesupport_fastrtps_cpp
+[ 76%] Built target px4_msgs__rosidl_typesupport_fastrtps_c
+running egg_info
+writing px4_msgs.egg-info/PKG-INFO
+writing dependency_links to px4_msgs.egg-info/dependency_links.txt
+writing top-level names to px4_msgs.egg-info/top_level.txt
+reading manifest file 'px4_msgs.egg-info/SOURCES.txt'
+writing manifest file 'px4_msgs.egg-info/SOURCES.txt'
+[ 76%] Built target ament_cmake_python_build_px4_msgs_egg
+Traceback (most recent call last):
+  File "/opt/ros/humble/lib/rosidl_typesupport_c/rosidl_typesupport_c", line 28, in <module>
+    sys.exit(main())
+  File "/opt/ros/humble/lib/rosidl_typesupport_c/rosidl_typesupport_c", line 24, in main
+gmake[2]: *** Deleting file 'rosidl_typesupport_c/px4_msgs/msg/action_request__type_support.cpp'
+    generate_c(args.generator_arguments_file, args.typesupports)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rosidl_typesupport_c/__init__.py", line 28, in generate_c
+    return generate_files(
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rosidl_cmake/__init__.py", line 74, in generate_files
+    idl_file = parse_idl_file(locator)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rosidl_parser/parser.py", line 64, in parse_idl_file
+    content = parse_idl_string(string, png_file=png_file)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rosidl_parser/parser.py", line 72, in parse_idl_string
+    tree = get_ast_from_idl_string(idl_string)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rosidl_parser/parser.py", line 89, in get_ast_from_idl_string
+    return _parser.parse(idl_string)
+  File "/usr/lib/python3/dist-packages/lark/lark.py", line 619, in parse
+    return self.parser.parse(text, start=start, on_error=on_error)
+  File "/usr/lib/python3/dist-packages/lark/parser_frontends.py", line 99, in parse
+    return self.parser.parse(stream, chosen_start, **kw)
+  File "/usr/lib/python3/dist-packages/lark/parsers/earley.py", line 266, in parse
+    to_scan = self._parse(lexer, columns, to_scan, start_symbol)
+  File "/usr/lib/python3/dist-packages/lark/parsers/xearley.py", line 144, in _parse
+    self.predict_and_complete(i, to_scan, columns, transitives)
+  File "/usr/lib/python3/dist-packages/lark/parsers/earley.py", line 140, in predict_and_complete
+    new_item = Item(rule, 0, i)
+  File "/usr/lib/python3/dist-packages/lark/parsers/earley_common.py", line 22, in __init__
+    self.previous = rule.expansion[ptr - 1] if ptr > 0 and len(rule.expansion) else None
+KeyboardInterrupt
+gmake[2]: *** [CMakeFiles/px4_msgs__rosidl_typesupport_c.dir/build.make:317: rosidl_typesupport_c/px4_msgs/msg/action_request__type_support.cpp] Interrupt
+gmake[1]: *** [CMakeFiles/Makefile2:342: CMakeFiles/px4_msgs__rosidl_typesupport_c.dir/all] Interrupt
+gmake: *** [Makefile:146: all] Interrupt

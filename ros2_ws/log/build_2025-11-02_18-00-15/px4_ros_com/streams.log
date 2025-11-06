@@ -1,0 +1,70 @@
+[0.868s] Invoking command in '/home/uav/uav/ros2_ws/build/px4_ros_com': CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:/home/uav/uav/ros2_ws/install/px4_ros_com:/home/uav/uav/ros2_ws/install/px4_ctrl_ex:/opt/ros/humble LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:/home/uav/uav/ros2_ws/install/px4_ros_com/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib /usr/bin/cmake --build /home/uav/uav/ros2_ws/build/px4_ros_com -- -j6 -l6
+[1.118s] [ 16%] Built target frame_transforms
+[1.176s] [ 33%] Built target offboard_control_srv
+[1.247s] [ 33%] Built target ament_cmake_python_copy_px4_ros_com
+[1.304s] [ 50%] Built target offboard_control
+[2.145s] running egg_info
+[2.145s] writing px4_ros_com.egg-info/PKG-INFO
+[2.145s] writing dependency_links to px4_ros_com.egg-info/dependency_links.txt
+[2.146s] writing top-level names to px4_ros_com.egg-info/top_level.txt
+[2.152s] reading manifest file 'px4_ros_com.egg-info/SOURCES.txt'
+[2.154s] writing manifest file 'px4_ros_com.egg-info/SOURCES.txt'
+[2.238s] [ 50%] Built target ament_cmake_python_build_px4_ros_com_egg
+[2.295s] [ 66%] Built target debug_vect_advertiser
+[2.385s] [ 83%] Built target vehicle_gps_position_listener
+[2.485s] [100%] Built target sensor_combined_listener
+[2.525s] Invoked command in '/home/uav/uav/ros2_ws/build/px4_ros_com' returned '0': CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:/home/uav/uav/ros2_ws/install/px4_ros_com:/home/uav/uav/ros2_ws/install/px4_ctrl_ex:/opt/ros/humble LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:/home/uav/uav/ros2_ws/install/px4_ros_com/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib /usr/bin/cmake --build /home/uav/uav/ros2_ws/build/px4_ros_com -- -j6 -l6
+[2.527s] Invoking command in '/home/uav/uav/ros2_ws/build/px4_ros_com': CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:/home/uav/uav/ros2_ws/install/px4_ros_com:/home/uav/uav/ros2_ws/install/px4_ctrl_ex:/opt/ros/humble LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:/home/uav/uav/ros2_ws/install/px4_ros_com/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib /usr/bin/cmake --install /home/uav/uav/ros2_ws/build/px4_ros_com
+[2.553s] -- Install configuration: ""
+[2.556s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/lib/px4_ros_com/sensor_combined_listener
+[2.558s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/lib/px4_ros_com/vehicle_gps_position_listener
+[2.559s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/lib/px4_ros_com/debug_vect_advertiser
+[2.560s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/lib/px4_ros_com/offboard_control
+[2.562s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/lib/px4_ros_com/offboard_control_srv
+[2.563s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/library_path.sh
+[2.563s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/library_path.dsv
+[2.564s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/include/px4_ros_com
+[2.565s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/include/px4_ros_com/frame_transforms.h
+[2.567s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/lib/libframe_transforms.so
+[2.568s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//launch
+[2.568s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//launch/sensor_combined_listener.launch.py
+[2.569s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//launch/offboard_control_launch.yaml
+[2.569s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//test
+[2.571s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//test/test_output.py
+[2.571s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//test/pipeline_io_test.py
+[2.571s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//test/test_input.py
+[2.571s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com//test/__init__.py
+[2.572s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/pythonpath.sh
+[2.573s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/pythonpath.dsv
+[2.573s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com-0.1.0-py3.10.egg-info
+[2.573s] -- Installing: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com-0.1.0-py3.10.egg-info/top_level.txt
+[2.574s] -- Installing: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com-0.1.0-py3.10.egg-info/SOURCES.txt
+[2.574s] -- Installing: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com-0.1.0-py3.10.egg-info/PKG-INFO
+[2.575s] -- Installing: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com-0.1.0-py3.10.egg-info/dependency_links.txt
+[2.575s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com
+[2.575s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com/module_to_import.py
+[2.576s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com/__init__.py
+[2.688s] Listing '/home/uav/uav/ros2_ws/install/px4_ros_com/local/lib/python3.10/dist-packages/px4_ros_com'...
+[2.705s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/lib/px4_ros_com/offboard_control.py
+[2.706s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/ament_index/resource_index/package_run_dependencies/px4_ros_com
+[2.706s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/ament_index/resource_index/parent_prefix_path/px4_ros_com
+[2.707s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/ament_prefix_path.sh
+[2.707s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/ament_prefix_path.dsv
+[2.708s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/path.sh
+[2.708s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/environment/path.dsv
+[2.708s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/local_setup.bash
+[2.709s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/local_setup.sh
+[2.709s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/local_setup.zsh
+[2.709s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/local_setup.dsv
+[2.710s] -- Installing: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/package.dsv
+[2.710s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/ament_index/resource_index/packages/px4_ros_com
+[2.710s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/export_frame_transformsExport.cmake
+[2.711s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/export_frame_transformsExport-noconfig.cmake
+[2.711s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/ament_cmake_export_dependencies-extras.cmake
+[2.712s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/ament_cmake_export_targets-extras.cmake
+[2.712s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/ament_cmake_export_include_directories-extras.cmake
+[2.712s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/ament_cmake_export_libraries-extras.cmake
+[2.712s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/px4_ros_comConfig.cmake
+[2.712s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/cmake/px4_ros_comConfig-version.cmake
+[2.717s] -- Up-to-date: /home/uav/uav/ros2_ws/install/px4_ros_com/share/px4_ros_com/package.xml
+[2.724s] Invoked command in '/home/uav/uav/ros2_ws/build/px4_ros_com' returned '0': CMAKE_PREFIX_PATH=/home/uav/uav/ros2_ws/install/px4_msgs:/home/uav/uav/ros2_ws/install/px4_ros_com:/home/uav/uav/ros2_ws/install/px4_ctrl_ex:/opt/ros/humble LD_LIBRARY_PATH=/home/uav/uav/ros2_ws/install/px4_msgs/lib:/home/uav/uav/ros2_ws/install/px4_ros_com/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib /usr/bin/cmake --install /home/uav/uav/ros2_ws/build/px4_ros_com
