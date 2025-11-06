@@ -1,9 +1,0 @@
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/uninstall.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/uav_models_uninstall.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/test.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/edit_cache.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/rebuild_cache.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/list_install_components.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/install.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/install/local.dir
-/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/CMakeFiles/install/strip.dir

@@ -1,0 +1,23 @@
+# ROS2 workspace build artifacts
+**/build/
+**/install/
+**/log/
+
+# OS or editor files
+.DS_Store
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# JetBrains IDEs
+.idea/

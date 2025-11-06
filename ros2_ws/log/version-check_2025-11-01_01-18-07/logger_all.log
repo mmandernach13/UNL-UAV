@@ -1,2 +1,0 @@
-[0.218s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'version-check']
-[0.219s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='version-check', mixin_files=None, mixin=None, verb_parser=<colcon_mixin.mixin.mixin_argument.MixinArgumentDecorator object at 0xffffbc4f69e0>, verb_extension=<colcon_devtools.verb.version_check.VersionCheckVerb object at 0xffffbc4f5210>, main=<bound method VersionCheckVerb.main of <colcon_devtools.verb.version_check.VersionCheckVerb object at 0xffffbc4f5210>>, mixin_verb=('version-check',))
