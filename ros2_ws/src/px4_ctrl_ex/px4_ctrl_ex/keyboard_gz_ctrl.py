@@ -1,3 +1,5 @@
+# not working, but i dont think it is worth it to get this as it wont be used much
+
 from geometry_msgs.msg import Twist
 import rclpy
 from rclpy.node import Node
