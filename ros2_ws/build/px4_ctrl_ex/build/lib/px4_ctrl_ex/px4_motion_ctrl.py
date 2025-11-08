@@ -39,7 +39,7 @@ class UAVControl( Node ):
              time.sleep(0.1)
         print("... position received")
 
-        z_takeoff = self.uav_position[2] - 2.0
+        z_takeoff = self.uav_position[2] - 10.0
 
         offboard_signal_msg = OffboardControlMode()
         offboard_signal_msg.position = True

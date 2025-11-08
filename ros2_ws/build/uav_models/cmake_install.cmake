@@ -43,6 +43,13 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/uav_models" TYPE DIRECTORY FILES
+    "/home/uav/uav/unl_uav_repo/ros2_ws/src/uav_models/models"
+    "/home/uav/uav/unl_uav_repo/ros2_ws/src/uav_models/worlds"
+    )
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/ament_index/resource_index/package_run_dependencies" TYPE FILE FILES "/home/uav/uav/unl_uav_repo/ros2_ws/build/uav_models/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/uav_models")
 endif()
 

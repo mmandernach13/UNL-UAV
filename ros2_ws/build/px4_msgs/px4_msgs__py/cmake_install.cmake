@@ -1,8 +1,8 @@
-# Install script for directory: /home/uav/uav/ros2_ws/build/px4_msgs/px4_msgs__py
+# Install script for directory: /home/uav/uav/unl_uav_repo/ros2_ws/build/px4_msgs/px4_msgs__py
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "/home/uav/uav/ros2_ws/install/px4_msgs")
+  set(CMAKE_INSTALL_PREFIX "/home/uav/uav/unl_uav_repo/ros2_ws/install/px4_msgs")
 endif()
 string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 

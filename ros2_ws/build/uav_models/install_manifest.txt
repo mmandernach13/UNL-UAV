@@ -1,3 +1,5 @@
+/home/uav/uav/unl_uav_repo/ros2_ws/install/uav_models/share/uav_models/models/unl_x500/model.config
+/home/uav/uav/unl_uav_repo/ros2_ws/install/uav_models/share/uav_models/models/unl_x500/model.sdf
 /home/uav/uav/unl_uav_repo/ros2_ws/install/uav_models/share/ament_index/resource_index/package_run_dependencies/uav_models
 /home/uav/uav/unl_uav_repo/ros2_ws/install/uav_models/share/ament_index/resource_index/parent_prefix_path/uav_models
 /home/uav/uav/unl_uav_repo/ros2_ws/install/uav_models/share/uav_models/environment/ament_prefix_path.sh
