@@ -10,10 +10,8 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
 from geometry_msgs.msg import PoseStamped
 from uav_interfaces.action import GoToWaypoint
-import threading
-import time
 import math
-import numpy as np
+
 
 class PositionController(Node):
     def __init__(self): 
