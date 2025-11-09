@@ -54,9 +54,8 @@ class PositionController(Node):
             goal_callback=self.goal_waypoint_cb,
             cancel_callback=self.cancel_waypoint_cb,
             execute_callback=self.excecute_waypoint_cb,
-            callback_group=ReentrantCallbackGroup(),
-            qos_profile=qos_profile
-        )
+            callback_group=ReentrantCallbackGroup())
+        
         self.get_logger().info('Action server started')
 
         self.maintain_offboard_timer = self.create_timer(1/self.offboard_rate, self.maintain_offboard_cb)
