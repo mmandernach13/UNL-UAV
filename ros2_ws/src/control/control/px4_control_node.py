@@ -2,18 +2,19 @@
 
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer
+from rclpy.action import ActionServer, GoalResponse, CancelResponse
+from rclpy.action.server import ServerGoalHandle
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
-from mission.action import GoToWaypoint
+from uav_interfaces.action import GoToWaypoint
 import threading
 import time
 import math
 import numpy as np
 
-class UAVControl(Node):
+class PositionController(Node):
     def __init__(self): 
-        super().__init__('uav_control_node')
+        super().__init__('position_control')
         
         # QoS Profile - Quality of Service settings for reliable PX4 communication
         # BEST_EFFORT: Don't guarantee delivery (faster, PX4 uses this)
@@ -32,8 +33,23 @@ class UAVControl(Node):
         self.offboard_enable = False  # Flag: Is offboard mode active?
         self.armed = False  # Flag: Are motors armed?
 
-        self.action_server = ActionServer()
+        self.declare_parameter('loop_rate', 10.0)
+        self.loop_freq = self.get_parameter('loop_rate').value
+        self.rate = self.create_rate(self.loop_freq)
+
+        self.action_server = ActionServer(
+            self, 
+            GoToWaypoint,
+            'go_to_waypoint',
+            self.excecute_waypoint_cb,
+            qos_profile=qos_profile
+        )
         
+        self.declare_parameter('offboard_rate', 5.0)
+        self.offboard_rate = self.get_parameter('offboard_rate').value 
+
+        self.maintain_offboard_timer = self.create_timer(1/self.offboard_rate, self.maintain_offboard_cb)
+
         # SUBSCRIBERS - Listen to PX4 status and position
         # Vehicle position in local North-East-Down (NED) coordinate frame
         self.vehicle_local_position_sub = self.create_subscription(
@@ -82,7 +98,66 @@ class UAVControl(Node):
             qos_profile
         )
 
+    def send_offboard_signal(self):
+        offboard_signal_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        self.offboard_control_mode_publisher.publish(offboard_signal_msg)
 
+    def enter_offboard_mode(self):
+        # Create offboard control mode message
+        # This tells PX4 we want to control POSITION (not velocity/attitude/etc)
+        self.get_logger().info('Going into OFFBOARD mode')
+        global offboard_signal_msg 
+        offboard_signal_msg = OffboardControlMode()
+        offboard_signal_msg.position = True  # We'll send position setpoints
+        offboard_signal_msg.velocity = False
+        offboard_signal_msg.acceleration = False
+        offboard_signal_msg.attitude = False
+        offboard_signal_msg.body_rate = False
+
+        self.send_offboard_signal()
+
+        itr = 0
+
+        while(self.offboard_enable == False):
+            print("Wait offboard mode")
+            # Wait a bit before requesting (let offboard signal propagate)
+            if(itr > 10):
+                cmd_msg = VehicleCommand()
+                cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
+                cmd_msg.param1 = 1.0  # Custom mode enabled
+                cmd_msg.param2 = 6.0  # Offboard mode (PX4_CUSTOM_MAIN_MODE_OFFBOARD)
+                cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                self.vehicle_command_publisher.publish(cmd_msg)
+            itr = itr + 1 
+            self.rate.sleep()
+
+        self.get_logger().info('OFFBOARD mode enabled')
+
+    def arm_uav(self):
+        self.get_logger().info('Arming UAV')
+        cmd_msg = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
+        cmd_msg.param1 = 1.0  # 1.0 = arm, 0.0 = disarm
+        
+        while (self.armed == False):
+            print('waiting to arm')
+            cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.vehicle_command_publisher.publish(cmd_msg)
+            self.rate.sleep()
+
+        self.get_logger().info('UAV armed')
+
+    def excecute_waypoint_cb(self, goal: GoToWaypoint):
+
+        if (self.offboard_enable == False):
+            self.enter_offboard_mode()
+
+        if (self.armed == False):
+            self.arm_uav()
+
+        
+
+        return result
    
     def main_loop(self):
         """
@@ -203,6 +278,11 @@ class UAVControl(Node):
                         self.trajectory_setpoint_publisher.publish(msg)
 
                 rate.sleep()
+
+    # CALLBACK: maintains offboard control (have to publish at >2Hz)
+    def maintain_offboard_cb(self):
+        if self.offboard_enable:
+            self.send_offboard_signal()
 
     # CALLBACK: Update armed status from vehicle status
     def status_cb(self, status):
