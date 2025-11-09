@@ -5,6 +5,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
+from mission.action import GoToWaypoint
 import threading
 import time
 import math
@@ -30,6 +31,8 @@ class UAVControl(Node):
         self.take_off = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
         self.armed = False  # Flag: Are motors armed?
+
+        self.action_server = ActionServer()
         
         # SUBSCRIBERS - Listen to PX4 status and position
         # Vehicle position in local North-East-Down (NED) coordinate frame
