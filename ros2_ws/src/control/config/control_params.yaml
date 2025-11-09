@@ -1,0 +1,6 @@
+/position_control:
+  ros__parameters:
+    loop_rate : 10.0
+    stamp_delta_ns : 1000
+    offboard_rate : 5.0
+    pose_delta : 0.2
