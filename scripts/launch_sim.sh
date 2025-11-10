@@ -22,6 +22,29 @@ if [ ! -d "$MICRO_DDS_DIR" ]; then
     exit 1
 fi
 
+if command -v tmux >/dev/null 2>&1; then
+        echo "tmux is already installed."
+else
+    echo "tmux not found. Installing..."
+
+    if [ -x "$(command -v apt)" ]; then
+        sudo apt update && sudo apt install -y tmux
+    elif [ -x "$(command -v dnf)" ]; then
+        sudo dnf install -y tmux
+    elif [ -x "$(command -v yum)" ]; then
+        sudo yum install -y tmux
+    elif [ -x "$(command -v pacman)" ]; then
+        sudo pacman -Sy --noconfirm tmux
+    elif [ -x "$(command -v brew)" ]; then
+        brew install tmux
+    else
+        echo "No supported package manager found. Please install tmux manually."
+        return 1
+    fi
+
+    echo "tmux installed successfully."
+fi 
+
 # Create a new tmux session named "uav_sim"
 SESSION_NAME="uav_sim"
 
