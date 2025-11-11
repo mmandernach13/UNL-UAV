@@ -29,10 +29,12 @@ class PositionController(Node):
         )
 
         # State variables to track UAV status
-        self.uav_pos = []  # Current [x, y, z] position in local NED frame
+        self.uav_pos = UavPos()  # Current [x, y, z], yaw position of UAV
         self.take_off = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
         self.armed = False  # Flag: Are motors armed?
+        global offboard_signal_msg
+        offboard_signal_msg = OffboardControlMode()
 
         self.declare_parameter('loop_rate', 10.0)
         self.loop_freq = self.get_parameter('loop_rate').value
@@ -119,8 +121,7 @@ class PositionController(Node):
     def enter_offboard_mode(self):
         # Create offboard control mode message
         # This tells PX4 we want to control POSITION (not velocity/attitude/etc)
-        self.get_logger().info('Going into OFFBOARD mode')
-        global offboard_signal_msg 
+        self.get_logger().info('Going into OFFBOARD mode') 
         offboard_signal_msg = OffboardControlMode()
         offboard_signal_msg.position = True  # We'll send position setpoints
         offboard_signal_msg.velocity = False
@@ -167,17 +168,17 @@ class PositionController(Node):
         self.get_logger().info('Position goal received')
 
         new_pos: UavPos = goal_request.target_pos
-        if (new_pos.pos[0] == self.uav_pos[0]) and \
-           (new_pos.pos[1] == self.uav_pos[1]) and \
-           (new_pos.pos[2] == self.uav_pos[2]):
+        if (new_pos.pos[0] == self.uav_pos.pos[0]) and \
+           (new_pos.pos[1] == self.uav_pos.pos[1]) and \
+           (new_pos.pos[2] == self.uav_pos.pos[2]):
             self.get_logger().info('REJECT already at requested position')
             return GoalResponse.REJECT
-        elif new_pos.pos[2] < 0:
+        elif new_pos.pos[2] > 0:
             self.get_logger().info('REJECT height request is out of bounds')
             return GoalResponse.REJECT
-        elif new_pos.stamp.nanosec < self.get_clock().now().nanoseconds:
-            self.get_logger().info('REJECT time stamp of request is in the past')
-            return GoalResponse.REJECT
+        # elif new_pos.stamp.nanosec > self.get_clock().now().nanoseconds:
+        #     self.get_logger().info('REJECT time stamp of request is in the past')
+        #     return GoalResponse.REJECT
         
         self.get_logger().info(f'ACCEPT goal for UavPos: {new_pos.pos}')
         return GoalResponse.ACCEPT 
@@ -200,13 +201,12 @@ class PositionController(Node):
             self.arm_uav()
 
         target_pos: UavPos = goal.request.target_pos
-        target_coords = target_pos.pos
 
         result = GoToPos.Result()
         feedback = GoToPos.Feedback()
 
         self.get_logger().info('Executing Goal')
-        dist = self.distance_3d(target_coords, self.uav_pos)
+        dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
         
         while dist > self.pos_delta:
             if goal.is_cancel_requested:
@@ -219,33 +219,30 @@ class PositionController(Node):
             msg = TrajectorySetpoint()
                     
             # Check if we've reached takeoff altitude (within 0.3m)
-            if(math.fabs(self.uav_pos[2] - target_coords[2]) < self.pos_delta):
+            if(math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
                 self.take_off = True
             
             # If at takeoff altitude, start waypoint navigation
             if (self.take_off == True):
-                    msg.position = target_coords
+                    msg.position = target_pos.pos
                     msg.yaw = target_pos.yaw
                     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                     self.trajectory_setpoint_publisher.publish(msg)
                     
                     # Check if we're close enough to current waypoint
-                    distance = self.distance_2d(target_coords, self.uav_pos) 
+                    distance = self.distance_2d(target_pos.pos, self.uav_pos.pos) 
             else:
                 # Still taking off - hold horizontal position, climb to altitude
-                msg.position = [self.uav_pos[0], 
-                                self.uav_pos[1], 
-                                target_coords[2]]
+                msg.position = [self.uav_pos.pos[0], 
+                                self.uav_pos.pos[1], 
+                                target_pos.pos[2]]
                 msg.yaw = 0.0  
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
             
-            dist = self.distance_3d(target_coords, self.uav_pos)
+            dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
             cp = UavPos()
-            cp.pos = self.uav_pos
-            cp.stamp = self.get_clock().now().to_msg()
-            cp.yaw = 0.0 # We don't have a good way to get current yaw yet
-            cp.frame_id = "map"
+            cp = self.uav_pos
             feedback.distance_remaining = dist
             feedback.current_pos = cp
             goal.publish_feedback(feedback)
@@ -274,20 +271,13 @@ class PositionController(Node):
     # CALLBACK: Update current position
     def vehicle_local_position_cb(self, local_pos):
         # Store position in NED frame (North, East, Down)
-        self.uav_pos = [local_pos.x, local_pos.y, local_pos.z]
+        self.uav_pos.pos = [local_pos.x, local_pos.y, local_pos.z]
+        self.uav_pos.stamp = local_pos.timestamp
 
     def distance_2d(self, pos1, pos2):
         # Handle list/tuple input
-        if isinstance(pos1, (list, tuple)):
-            x1, y1, _ = pos1[0], pos1[1], pos1[2]
-        else:
-            # Handle object with attributes (like PoseStamped)
-            x1, y1, _ = pos1.x, pos1.y, pos1.z
-        
-        if isinstance(pos2, (list, tuple)):
-            x2, y2, _ = pos2[0], pos2[1], pos2[2]
-        else:
-            x2, y2, _ = pos2.x, pos2.y, pos2.z
+        x1, y1, _ = pos1[0], pos1[1], pos1[2]
+        x2, y2, _ = pos2[0], pos2[1], pos2[2]
         
         dx = x2 - x1
         dy = y2 - y1
