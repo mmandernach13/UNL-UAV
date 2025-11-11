@@ -201,7 +201,6 @@ class PositionController(Node):
             self.arm_uav()
 
         target_pos: UavPos = goal.request.target_pos
-
         result = GoToPos.Result()
         feedback = GoToPos.Feedback()
 
