@@ -8,7 +8,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
-from geometry_msgs.msg import PoseStamped
+from uav_interfaces.msg import Waypoint 
 from uav_interfaces.action import GoToWaypoint
 import math
 
@@ -37,9 +37,6 @@ class PositionController(Node):
         self.declare_parameter('loop_rate', 10.0)
         self.loop_freq = self.get_parameter('loop_rate').value
         self.rate = self.create_rate(self.loop_freq)
-
-        self.declare_parameter('stamp_delta_ns', 1000)
-        self.stamp_delta = self.get_parameter('stamp_delta_ns').value
 
         self.declare_parameter('offboard_rate', 5.0)
         self.offboard_rate = self.get_parameter('offboard_rate').value 
@@ -169,20 +166,20 @@ class PositionController(Node):
     def goal_waypoint_cb(self, goal_request: GoToWaypoint.Goal):
         self.get_logger().info('Waypoint goal received')
 
-        new_pos: PoseStamped = goal_request
-        if (new_pos.pose.position.x == self.uav_position[0]) and \
-           (new_pos.pose.position.y == self.uav_position[1]) and \
-           (new_pos.pose.position.z == self.uav_position[2]):
+        new_pos: Waypoint = goal_request
+        if (new_pos.pose.pos[0] == self.uav_position[0]) and \
+           (new_pos.pose.pos[1] == self.uav_position[1]) and \
+           (new_pos.pose.pos[2] == self.uav_position[2]):
             self.get_logger().info('REJECT already at requested position')
             return GoalResponse.REJECT
-        elif new_pos.pose.position.z < 0:
+        elif new_pos.pose.pos[2] < 0:
             self.get_logger().info('REJECT height request is out of bounds')
             return GoalResponse.REJECT
-        elif math.fabs(new_pos.header.stamp.nanosec - self.get_clock().now().nanoseconds) < self.stamp_delta:
-            self.get_logger().info('REJECT time stamp of request is too far in the past')
+        elif math.fabs(new_pos.stamp.nanosec < self.get_clock().now().nanoseconds):
+            self.get_logger().info('REJECT time stamp of request is in the past')
             return GoalResponse.REJECT
         
-        self.get_logger().info(f'ACCEPT goal for waypoint: {new_pos.pose.position}')
+        self.get_logger().info(f'ACCEPT goal for waypoint: {new_pos.pos}')
         return GoalResponse.ACCEPT 
 
     # Any cancel request will be processed here, we can accept or reject it
