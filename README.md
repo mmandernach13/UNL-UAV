@@ -22,7 +22,6 @@ To set up the UNL-UAV project, including ROS2 Humble, PX4 Autopilot, and Micro-X
     ```
     This script will:
     *   Install ROS2 Humble and its development tools.
-    *   Build your ROS2 workspace.
     *   Install PX4 Autopilot and its dependencies.
     *   Install the Micro-XRCE-DDS Agent.
 
@@ -40,6 +39,6 @@ To start a basic simulation with `px4_sitl` run the following command from the `
 ```bash
 ./scripts/launch_sim.sh
 ```
-Running this over an SSH connection will start the simulation without the GUI, and running it on the offboard computer directly will start the Gazebo GUI. 
+Running this over an SSH connection will start the simulation without the GUI, and running it on the offboard computer directly will start the Gazebo GUI. If you set up the project in WSL, the GUI will still pop up. 
 
 Running the rest of the ROS2 nodes is still a work in progress as they are not written yet. 
