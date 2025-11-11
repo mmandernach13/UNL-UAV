@@ -1,5 +1,6 @@
 # Goal - where to go
-geometry_msgs/PoseStamped target_pose
+float32[3] target_position
+float32 yaw
 ---
 # Result - did we make it?
 bool success
