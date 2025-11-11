@@ -166,20 +166,20 @@ class PositionController(Node):
     def goal_waypoint_cb(self, goal_request: GoToWaypoint.Goal):
         self.get_logger().info('Waypoint goal received')
 
-        new_pos: Waypoint = goal_request
-        if (new_pos.pose.pos[0] == self.uav_position[0]) and \
-           (new_pos.pose.pos[1] == self.uav_position[1]) and \
-           (new_pos.pose.pos[2] == self.uav_position[2]):
+        new_pos: Waypoint = goal_request.target_waypoint
+        if (new_pos.position[0] == self.uav_position[0]) and \
+           (new_pos.position[1] == self.uav_position[1]) and \
+           (new_pos.position[2] == self.uav_position[2]):
             self.get_logger().info('REJECT already at requested position')
             return GoalResponse.REJECT
-        elif new_pos.pose.pos[2] < 0:
+        elif new_pos.position[2] < 0:
             self.get_logger().info('REJECT height request is out of bounds')
             return GoalResponse.REJECT
-        elif math.fabs(new_pos.stamp.nanosec < self.get_clock().now().nanoseconds):
+        elif new_pos.stamp.nanosec < self.get_clock().now().nanoseconds:
             self.get_logger().info('REJECT time stamp of request is in the past')
             return GoalResponse.REJECT
         
-        self.get_logger().info(f'ACCEPT goal for waypoint: {new_pos.pos}')
+        self.get_logger().info(f'ACCEPT goal for waypoint: {new_pos.position}')
         return GoalResponse.ACCEPT 
 
     # Any cancel request will be processed here, we can accept or reject it
@@ -199,8 +199,8 @@ class PositionController(Node):
         if (self.armed == False):
             self.arm_uav()
 
-        target_pos: PoseStamped = goal.request.target_pose
-        target_coords = target_pos.pose.position
+        target_waypoint: Waypoint = goal.request.target_waypoint
+        target_coords = target_waypoint.position
 
         result = GoToWaypoint.Result()
         feedback = GoToWaypoint.Feedback()
@@ -219,33 +219,33 @@ class PositionController(Node):
             msg = TrajectorySetpoint()
                     
             # Check if we've reached takeoff altitude (within 0.3m)
-            if(math.fabs(self.uav_position[2] - target_coords.z) < self.pose_delta):
+            if(math.fabs(self.uav_position[2] - target_coords[2]) < self.pose_delta):
                 self.take_off = True
             
             # If at takeoff altitude, start waypoint navigation
             if (self.take_off == True):
-                    msg.position = [target_coords.x, 
-                                    target_coords.y, 
-                                    target_coords.z]
-                    msg.yaw = 0.0  # Face north (0 radians)
+                    msg.position = target_coords
+                    msg.yaw = target_waypoint.yaw
                     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                     self.trajectory_setpoint_publisher.publish(msg)
                     
                     # Check if we're close enough to current waypoint
-                    distance = self.distance_2d() 
+                    distance = self.distance_2d(target_coords, self.uav_position) 
             else:
                 # Still taking off - hold horizontal position, climb to altitude
                 msg.position = [self.uav_position[0], 
                                 self.uav_position[1], 
-                                target_coords.z]
+                                target_coords[2]]
                 msg.yaw = 0.0  
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
             
             dist = self.distance_3d(target_coords, self.uav_position)
-            cp = PoseStamped()
-            cp.pose.position = self.uav_position
-            cp.header.stamp.nanosec = self.get_clock().now().nanoseconds
+            cp = Waypoint()
+            cp.position = self.uav_position
+            cp.stamp = self.get_clock().now().to_msg()
+            cp.yaw = 0.0 # We don't have a good way to get current yaw yet
+            cp.frame_id = "map"
             feedback.distance_remaining = dist
             feedback.current_pose = cp
             goal.publish_feedback(feedback)
