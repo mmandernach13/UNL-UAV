@@ -8,8 +8,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
-from uav_interfaces.msg import Waypoint 
-from uav_interfaces.action import GoToWaypoint
+from uav_interfaces.msg import UavPos 
+from uav_interfaces.action import GoToPos
 import math
 
 
@@ -29,7 +29,7 @@ class PositionController(Node):
         )
 
         # State variables to track UAV status
-        self.uav_position = []  # Current [x, y, z] position in local NED frame
+        self.uav_pos = []  # Current [x, y, z] position in local NED frame
         self.take_off = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
         self.armed = False  # Flag: Are motors armed?
@@ -41,16 +41,16 @@ class PositionController(Node):
         self.declare_parameter('offboard_rate', 5.0)
         self.offboard_rate = self.get_parameter('offboard_rate').value 
 
-        self.declare_parameter('pose_delta', 0.3)
-        self.pose_delta = self.get_parameter('pose_delta').value 
+        self.declare_parameter('pos_delta', 0.3)
+        self.pos_delta = self.get_parameter('pos_delta').value 
 
         self.action_server = ActionServer(
             self, 
-            GoToWaypoint,
-            'go_to_waypoint',
-            goal_callback=self.goal_waypoint_cb,
-            cancel_callback=self.cancel_waypoint_cb,
-            execute_callback=self.excecute_waypoint_cb,
+            GoToPos,
+            'go_to_position',
+            goal_callback=self.goal_pos_cb,
+            cancel_callback=self.cancel_pos_cb,
+            execute_callback=self.excecute_pos_cb,
             callback_group=ReentrantCallbackGroup())
         
         self.get_logger().info('Action server started')
@@ -163,27 +163,27 @@ class PositionController(Node):
 
     # Every new received goal will be processed here first
     # We can decide to accept or reject the incoming goal
-    def goal_waypoint_cb(self, goal_request: GoToWaypoint.Goal):
-        self.get_logger().info('Waypoint goal received')
+    def goal_pos_cb(self, goal_request: GoToPos.Goal):
+        self.get_logger().info('Position goal received')
 
-        new_pos: Waypoint = goal_request.target_waypoint
-        if (new_pos.position[0] == self.uav_position[0]) and \
-           (new_pos.position[1] == self.uav_position[1]) and \
-           (new_pos.position[2] == self.uav_position[2]):
+        new_pos: UavPos = goal_request.target_pos
+        if (new_pos.pos[0] == self.uav_pos[0]) and \
+           (new_pos.pos[1] == self.uav_pos[1]) and \
+           (new_pos.pos[2] == self.uav_pos[2]):
             self.get_logger().info('REJECT already at requested position')
             return GoalResponse.REJECT
-        elif new_pos.position[2] < 0:
+        elif new_pos.pos[2] < 0:
             self.get_logger().info('REJECT height request is out of bounds')
             return GoalResponse.REJECT
         elif new_pos.stamp.nanosec < self.get_clock().now().nanoseconds:
             self.get_logger().info('REJECT time stamp of request is in the past')
             return GoalResponse.REJECT
         
-        self.get_logger().info(f'ACCEPT goal for waypoint: {new_pos.position}')
+        self.get_logger().info(f'ACCEPT goal for UavPos: {new_pos.pos}')
         return GoalResponse.ACCEPT 
 
     # Any cancel request will be processed here, we can accept or reject it
-    def cancel_waypoint_cb(self, goal_handle: ServerGoalHandle):
+    def cancel_pos_cb(self, goal_handle: ServerGoalHandle):
         self.get_logger().info('Received cancel request')
         # put in hover or land mode
         return CancelResponse.ACCEPT
@@ -191,7 +191,7 @@ class PositionController(Node):
     # If a goal has been accepted, it will then be executed in this callback
     # After we are done with the goal execution we set a final state and return the result
     # When executing the goal we also check if we need to cancel it
-    def excecute_waypoint_cb(self, goal: ServerGoalHandle):
+    def excecute_pos_cb(self, goal: ServerGoalHandle):
 
         if (self.offboard_enable == False):
             self.enter_offboard_mode()
@@ -199,62 +199,62 @@ class PositionController(Node):
         if (self.armed == False):
             self.arm_uav()
 
-        target_waypoint: Waypoint = goal.request.target_waypoint
-        target_coords = target_waypoint.position
+        target_pos: UavPos = goal.request.target_pos
+        target_coords = target_pos.pos
 
-        result = GoToWaypoint.Result()
-        feedback = GoToWaypoint.Feedback()
+        result = GoToPos.Result()
+        feedback = GoToPos.Feedback()
 
         self.get_logger().info('Executing Goal')
-        dist = self.distance_3d(target_coords, self.uav_position)
+        dist = self.distance_3d(target_coords, self.uav_pos)
         
-        while dist > self.pose_delta:
+        while dist > self.pos_delta:
             if goal.is_cancel_requested:
                 self.get_logger().info('Cancelling goal')
                 goal.canceled()
                 result.success = False 
-                result.message = f'reached position {self.uav_position}'
+                result.message = f'reached position {self.uav_pos}'
                 return result
             
             msg = TrajectorySetpoint()
                     
             # Check if we've reached takeoff altitude (within 0.3m)
-            if(math.fabs(self.uav_position[2] - target_coords[2]) < self.pose_delta):
+            if(math.fabs(self.uav_pos[2] - target_coords[2]) < self.pos_delta):
                 self.take_off = True
             
             # If at takeoff altitude, start waypoint navigation
             if (self.take_off == True):
                     msg.position = target_coords
-                    msg.yaw = target_waypoint.yaw
+                    msg.yaw = target_pos.yaw
                     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                     self.trajectory_setpoint_publisher.publish(msg)
                     
                     # Check if we're close enough to current waypoint
-                    distance = self.distance_2d(target_coords, self.uav_position) 
+                    distance = self.distance_2d(target_coords, self.uav_pos) 
             else:
                 # Still taking off - hold horizontal position, climb to altitude
-                msg.position = [self.uav_position[0], 
-                                self.uav_position[1], 
+                msg.position = [self.uav_pos[0], 
+                                self.uav_pos[1], 
                                 target_coords[2]]
                 msg.yaw = 0.0  
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
             
-            dist = self.distance_3d(target_coords, self.uav_position)
-            cp = Waypoint()
-            cp.position = self.uav_position
+            dist = self.distance_3d(target_coords, self.uav_pos)
+            cp = UavPos()
+            cp.pos = self.uav_pos
             cp.stamp = self.get_clock().now().to_msg()
             cp.yaw = 0.0 # We don't have a good way to get current yaw yet
             cp.frame_id = "map"
             feedback.distance_remaining = dist
-            feedback.current_pose = cp
+            feedback.current_pos = cp
             goal.publish_feedback(feedback)
 
             self.rate.sleep()
         
         goal.succeed()
         result.success = True
-        result.message = f'reached position {self.uav_position}'
+        result.message = f'reached position {self.uav_pos}'
         return result
    
     # CALLBACK: maintains offboard control (have to publish at >2Hz)
@@ -274,7 +274,7 @@ class PositionController(Node):
     # CALLBACK: Update current position
     def vehicle_local_position_cb(self, local_pos):
         # Store position in NED frame (North, East, Down)
-        self.uav_position = [local_pos.x, local_pos.y, local_pos.z]
+        self.uav_pos = [local_pos.x, local_pos.y, local_pos.z]
 
     def distance_2d(self, pos1, pos2):
         # Handle list/tuple input

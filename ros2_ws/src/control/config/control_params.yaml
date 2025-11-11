@@ -2,4 +2,4 @@
   ros__parameters:
     loop_rate : 10.0
     offboard_rate : 5.0
-    pose_delta : 0.2
+    pos_delta : 0.2
