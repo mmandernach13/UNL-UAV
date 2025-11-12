@@ -39,6 +39,10 @@ class MissionPlannerClientNode(Node):
         result = future.result().result
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info("Success")
+            global idx
+            idx += 1
+            if idx < len(pts):
+                self.send_goal(pts[idx])
         elif status == GoalStatus.STATUS_ABORTED:
             self.get_logger().error("Aborted")
         elif status == GoalStatus.STATUS_CANCELED:
@@ -55,10 +59,28 @@ def main(args=None):
     node = MissionPlannerClientNode()
     
     # Example of sending a goal
+    global pts
+    global idx 
+    idx = 0
+    pts = []
     target_pos = UavPos()
     target_pos.pos = [10.0, 10.0, -5.0]
     target_pos.yaw = 0.0
-    node.send_goal(target_pos)
+    pts.append(target_pos)
+    target_pos = UavPos()
+    target_pos.pos = [0.0, 10.0, -5.0]
+    target_pos.yaw = 0.0
+    pts.append(target_pos)
+    target_pos = UavPos()
+    target_pos.pos = [0.0, 0.0, -5.0]
+    target_pos.yaw = 0.0
+    pts.append(target_pos)
+    target_pos = UavPos()
+    target_pos.pos = [0.0, 0.0, 0.0]
+    target_pos.yaw = 0.0
+    pts.append(target_pos)
+
+    node.send_goal(pts[idx])
     
     rclpy.spin(node)
     rclpy.shutdown()
