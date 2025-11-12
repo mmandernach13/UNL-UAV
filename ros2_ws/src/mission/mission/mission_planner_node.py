@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -13,6 +14,9 @@ class MissionPlannerClientNode(Node):
     def __init__(self):
         super().__init__("mission_planner_client_node")
         self.mission_planner_client = ActionClient(self, GoToPos, "go_to_position")
+        self.get_logger().info("Mission Planner Client Node has been started.")
+        
+        self.mission_dir = os.getcwd() + "/src/mission/mission_files/"
     
     def send_goal(self, target_pos: UavPos):
         self.mission_planner_client.wait_for_server()
@@ -39,7 +43,6 @@ class MissionPlannerClientNode(Node):
         result = future.result().result
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info("Success")
-            global idx
             idx += 1
             if idx < len(pts):
                 self.send_goal(pts[idx])
@@ -53,34 +56,32 @@ class MissionPlannerClientNode(Node):
         feedback = feedback_msg.feedback
         self.get_logger().info("Got feedback: " + str(feedback.distance_remaining))
 
+    def get_waypoints_txt(self, filename: str):
+        filename = self.mission_dir + filename
+        waypoints = np.loadtxt(filename, delimiter=',') # csv format x, y, z, yaw, type
+        return waypoints
+        
+    def run_mission(self, filename: str = "ex_mission.txt"):
+        global pts, idx
+        waypoints = self.get_waypoints_txt(filename)
+        pts = []
+        for wp in waypoints:
+            pos = UavPos()
+            pos.pos[0] = float(wp[0])
+            pos.pos[1] = float(wp[1])
+            pos.pos[2] = float(wp[2])
+            pos.yaw = float(wp[3])
+            pos.type = int(wp[4])
+            pts.append(pos)
+        idx = 0
+        self.send_goal(pts[idx])
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = MissionPlannerClientNode()
-    
-    # Example of sending a goal
-    global pts
-    global idx 
-    idx = 0
-    pts = []
-    target_pos = UavPos()
-    target_pos.pos = [10.0, 10.0, -5.0]
-    target_pos.yaw = 0.0
-    pts.append(target_pos)
-    target_pos = UavPos()
-    target_pos.pos = [0.0, 10.0, -5.0]
-    target_pos.yaw = 0.0
-    pts.append(target_pos)
-    target_pos = UavPos()
-    target_pos.pos = [0.0, 0.0, -5.0]
-    target_pos.yaw = 0.0
-    pts.append(target_pos)
-    target_pos = UavPos()
-    target_pos.pos = [0.0, 0.0, 0.0]
-    target_pos.yaw = 0.0
-    pts.append(target_pos)
 
-    node.send_goal(pts[idx])
+    node.run_mission()
     
     rclpy.spin(node)
     rclpy.shutdown()
