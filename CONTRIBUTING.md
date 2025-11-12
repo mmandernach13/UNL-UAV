@@ -1,152 +1,155 @@
-# Contributing Guide for UAV Simulation Repo
+# Contributing to the UNL-UAV Project
 
-Welcome! This document explains how to work with this repository so everyone can contribute cleanly and without conflicts.
+First off, thank you for considering contributing! We're excited to have you on board. This guide is designed to help you get started, even if you've never contributed to a project on GitHub before.
 
----
+## The Big Picture: How We Work
 
-## 🚀 Workflow Overview
+We use a workflow that's standard for many open-source projects. It might seem like a lot of steps at first, but it's designed to keep the project clean and organized, and to make sure we can all work together without accidentally breaking things.
 
-We use a **feature-branch workflow** with **Pull Requests (PRs)** for all changes.  
-Do **not** push directly to `main`.
+Here's the basic idea:
 
-```
-main         # Always working and deployable
-develop      # Optional integration branch (use if many PRs at once)
-feature/*    # Individual work branches
-hotfix/*     # Quick fixes to main
-```
+1.  You create a personal copy of our project on GitHub (called a **fork**).
+2.  You download that copy to your computer (called **cloning**).
+3.  You create a new **branch** for your changes. Think of a branch as a separate workspace where you can make edits without affecting the main codebase.
+4.  You make your changes, and when you're done, you "push" them up to your fork on GitHub.
+5.  You open a **Pull Request (PR)**, which is a formal way of asking us to review your changes and "pull" them into the main project.
 
----
+This process ensures that all changes are reviewed before they become part of the main project, which helps us catch bugs and maintain quality.
 
-## 🛠️ Setting Up Your Local Repo
+## Your First-Time Setup (You only need to do this once)
 
-1. **Clone the repo**
-   ```bash
-   git clone git@github.com:<org>/<repo>.git
-   cd <repo>
-   ```
+### Step 1: Fork the Repository
 
-2. **Pull the latest changes**
-   ```bash
-   git checkout main
-   git pull origin main
-   ```
+A fork is your own personal copy of the repository on GitHub. You can make any changes you want to your fork without affecting the main project.
 
-3. **Create a feature branch**
-   ```bash
-   git checkout -b feature/<short-description>
-   ```
-   Example:
-   ```bash
-   git checkout -b feature/add-sitl-autostart
-   ```
+1.  Go to the main project repository page: [https://github.com/mmandernach13/UNL-UAV](https://github.com/mmandernach13/UNL-UAV)
+2.  In the top-right corner of the page, click the **Fork** button.
 
----
+You now have a copy of the repository in your own GitHub account!
 
-## 🧩 Making Changes
+### Step 2: Clone Your Fork
 
-- Keep commits small and meaningful.
-- Include a clear message:
-  ```bash
-  git commit -m "Add script to auto-start PX4 SITL without GCS"
-  ```
-- Test your code before committing.
+Now, you need to download your fork to your computer. This is called "cloning".
 
----
+1.  On your fork's GitHub page, click the green **Code** button.
+2.  Make sure `HTTPS` is selected, and copy the URL. It should look something like this: `https://github.com/YOUR_USERNAME/UNL-UAV.git`
+3.  Open a terminal on your computer and run this command (replace `YOUR_USERNAME` with your actual GitHub username):
 
-## 🧪 Testing Locally
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/UNL-UAV.git
+    ```
 
-1. Build your workspace:
-   ```bash
-   colcon build --symlink-install
-   ```
-2. Source your setup:
-   ```bash
-   source install/setup.bash
-   ```
-3. Run your launch scripts or tests as needed.
+4.  Now, navigate into the newly created directory:
 
----
+    ```bash
+    cd UNL-UAV
+    ```
 
-## 🔁 Keeping Your Branch Updated
+### Step 3: Connect Your Fork to the Main Repository
 
-Before merging:
+You need to tell your local repository about the main project so you can keep it updated with the latest changes.
+
+1.  In your terminal, add a new "remote" (a pointer to another repository) called `upstream` that points to the main project:
+
+    ```bash
+    git remote add upstream https://github.com/mmandernach13/UNL-UAV.git
+    ```
+
+2.  You can check that it worked by running:
+
+    ```bash
+    git remote -v
+    ```
+
+    You should see your fork listed as `origin` and the main project listed as `upstream`.
+
+## The Daily Workflow: Making a Change
+
+Now that you're all set up, here's how you'll make changes.
+
+### Step 1: Get the Latest Changes
+
+Before you start working, you should always make sure your local copy is up-to-date with the main project.
+
+1.  Make sure you are on your `main` branch:
+    ```bash
+    git checkout main
+    ```
+2.  "Fetch" the latest changes from the `upstream` (the main project) and merge them into your local `main` branch:
+    ```bash
+    git pull upstream main
+    ```
+
+### Step 2: Create a New Branch
+
+It's very important to work on a new branch for every new feature or bug fix. This keeps your changes isolated and easy to manage.
+
+1.  Create a new branch and switch to it. Give it a descriptive name, like `feature/add-new-sensor` or `bugfix/fix-takeoff-logic`.
+
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+
+### Step 3: Make Your Code Changes
+
+This is the fun part! Open the project in your favorite editor and make the changes you want to contribute.
+
+### Step 4: Save Your Changes (Commit)
+
+When you've made some progress, you need to save a snapshot of your changes. This is called a "commit".
+
+1.  You can see which files you've changed by running:
+    ```bash
+    git status
+    ```
+2.  Add the files you want to save to the "staging area". If you want to add all your changed files, you can do:
+    ```bash
+    git add .
+    ```
+3.  Now, "commit" your changes with a clear and descriptive message:
+    ```bash
+    git commit -m "feat: Add support for the new XYZ sensor"
+    ```
+    *Good commit messages are important!* Start with a prefix like `feat:`, `fix:`, `docs:`, or `refactor:` to describe the type of change.
+
+### Step 5: Push Your Branch to Your Fork
+
+Now you need to upload your new branch and its commits to your fork on GitHub.
+
 ```bash
-git fetch origin
-git pull origin main --rebase
+git push -u origin feature/your-feature-name
 ```
-If there are merge conflicts, fix them locally before pushing again.
+(You only need the `-u` the first time you push a new branch).
 
----
+## Creating a Pull Request (Asking for a Review)
 
-## 💬 Submitting a Pull Request (PR)
+A Pull Request (PR) is how you tell the project maintainers that you have some changes you'd like to merge into the main project.
 
-1. Push your branch:
-   ```bash
-   git push origin feature/<branch-name>
-   ```
-2. On GitHub, open a **Pull Request** from your branch → `main`.
-3. Fill out the PR template with:
-   - **What you changed**
-   - **Why you changed it**
-   - **How to test it**
-4. Wait for **review and approval**.
+1.  Go to your fork's page on GitHub (`https://github.com/YOUR_USERNAME/UNL-UAV`).
+2.  You should see a yellow banner that says "feature/your-feature-name had recent pushes". Click the **Compare & pull request** button.
+3.  This will take you to the "Open a pull request" page.
+4.  Make sure the "base repository" is `mmandernach13/UNL-UAV` and the "base" branch is `main`. The "head repository" should be your fork, and the "compare" branch should be your feature branch.
+5.  Give your PR a clear title and a description of the changes you made. Explain *why* you made them and *how* you tested them.
+6.  Click **Create pull request**.
 
-> PRs require at least one reviewer’s approval before merge.
+That's it! You've successfully submitted a contribution. The project maintainers will be notified, and they will review your changes. They might ask you to make some adjustments. Once everyone is happy, your changes will be merged into the main project.
 
----
+## After Your PR is Merged
 
-## ⚖️ Code Review Guidelines
+Once your PR is approved and merged, you can safely delete your branch.
 
-When reviewing a teammate’s PR:
-- Check for correctness and clarity.
-- Confirm that launch scripts and configs still work.
-- Leave constructive comments.
-- Approve once satisfied.
+1.  Switch back to your `main` branch:
+    ```bash
+    git checkout main
+    ```
+2.  Update your local `main` branch with the newly merged changes from `upstream`:
+    ```bash
+    git pull upstream main
+    ```
+3a. Delete the local branch:
+    ```bash
+    git branch -d feature/your-feature-name
+    ```
+3b. You can also delete the remote branch from your fork on GitHub.
 
----
-
-## 🧱 Branch Protection Rules (for Maintainers)
-
-In GitHub → Settings → Branches → “main”:
-- ✅ Require pull request before merging  
-- ✅ Require 1 approval  
-- ✅ Disallow force pushes  
-- ✅ Require status checks (optional if you add CI later)
-
----
-
-## 🔥 Hotfixes
-
-If something breaks in `main`, create a hotfix branch:
-```bash
-git checkout -b hotfix/fix-broken-launch
-# Make fix
-git commit -m "Fix broken PX4 launch path"
-git push origin hotfix/fix-broken-launch
-```
-Then make a PR and merge once approved.
-
----
-
-## 🧹 Cleaning Up
-
-After your PR is merged:
-```bash
-git checkout main
-git pull origin main
-git branch -d feature/<your-branch>
-```
-
----
-
-## 🤝 Good Practices
-
-- Keep scripts portable (no user-specific paths)
-- Use relative paths (`$REPO_ROOT`) when possible
-- Avoid modifying the PX4 or Gazebo repos directly
-- Use `px4_config/` for local configuration
-
----
-
-Thanks for helping keep this repo clean and collaborative!
+Thank you for contributing to our project!
