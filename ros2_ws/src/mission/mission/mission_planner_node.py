@@ -43,6 +43,7 @@ class MissionPlannerClientNode(Node):
         result = future.result().result
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info("Success")
+            global pts, idx
             idx += 1
             if idx < len(pts):
                 self.send_goal(pts[idx])
