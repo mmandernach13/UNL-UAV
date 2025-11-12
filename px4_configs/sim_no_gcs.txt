@@ -1,0 +1,5 @@
+# Disable GCS/RC requirements for offboard mode
+COM_RC_IN_MODE 1      
+COM_ARM_WO_GPS 1         
+NAV_DLL_ACT 0            
+
