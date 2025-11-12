@@ -42,7 +42,7 @@ class PositionController(Node):
         self.loop_freq = self.get_parameter('loop_rate').value
         self.rate = self.create_rate(self.loop_freq)
 
-        self.declare_parameter('offboard_rate', 10.0)
+        self.declare_parameter('offboard_rate', 5.0)
         self.offboard_rate = self.get_parameter('offboard_rate').value 
 
         self.declare_parameter('pos_delta', 0.3)
@@ -124,7 +124,6 @@ class PositionController(Node):
         # Create offboard control mode message
         # This tells PX4 we want to control POSITION (not velocity/attitude/etc)
         self.get_logger().info('Going into OFFBOARD mode') 
-        offboard_signal_msg = OffboardControlMode()
         offboard_signal_msg.position = True  # We'll send position setpoints
         offboard_signal_msg.velocity = False
         offboard_signal_msg.acceleration = False
@@ -237,7 +236,8 @@ class PositionController(Node):
                 msg = TrajectorySetpoint()
                         
                 # Check if we've reached takeoff altitude
-                if(math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
+                if(math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta) and (self.take_off == False):
+                    self.get_logger().info('Takeoff altitude reached')
                     self.take_off = True
                 
                 # If at takeoff altitude, start waypoint navigation
@@ -251,9 +251,10 @@ class PositionController(Node):
                         distance = self.distance_2d(target_pos.pos, self.uav_pos.pos) 
                 else:
                     # Still taking off - hold horizontal position, climb to altitude
-                    msg.position = [self.uav_pos.pos[0], 
-                                    self.uav_pos.pos[1], 
-                                    target_pos.pos[2]]
+                    self.get_logger().info(f'Taking off: climbing to {target_pos.pos[2]} m, hold pos x:{self.uav_pos.pos[0]}, y:{self.uav_pos.pos[1]}')
+                    msg.position = [float(self.uav_pos.pos[0]), 
+                                    float(self.uav_pos.pos[1]), 
+                                    float(target_pos.pos[2])]
                     msg.yaw = 0.0  
                     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                     self.trajectory_setpoint_publisher.publish(msg)
