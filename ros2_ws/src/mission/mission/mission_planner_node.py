@@ -11,6 +11,15 @@ import numpy as np
 
 
 class MissionPlannerClientNode(Node):
+
+    mission_states = {
+        "TAKE_OFF"    : 0,
+        "HOVER"       : 1,
+        "WAYPOINT"    : 2,
+        "LAND"        : 3,
+        "RETURN_HOME" : 4,
+    }
+
     def __init__(self):
         super().__init__("mission_planner_client_node")
         self.mission_planner_client = ActionClient(self, GoToPos, "go_to_position")
