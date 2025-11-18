@@ -31,7 +31,8 @@ class PositionController(Node):
 
         # State variables to track UAV status
         self.uav_pos = UavPos()  # Current [x, y, z], yaw position of UAV
-        self.take_off = False   # Flag: Has UAV reached takeoff altitude?
+        self.last_pos_cmd = UavPos()  # Last position command sent to UAV
+        self.uav_airborn = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
         self.armed = False  # Flag: Are motors armed?
         self.action_in_progress = False  # Flag: Is an action currently being executed?
@@ -171,7 +172,7 @@ class PositionController(Node):
             self.get_logger().info('UAV armed')
         else:
             self.get_logger().error('Failed to arm! Check PX4 console')
-
+        
     # Every new received goal will be processed here first
     # We can decide to accept or reject the incoming goal
     def goal_pos_cb(self, goal_request: GoToPos.Goal):
@@ -204,7 +205,6 @@ class PositionController(Node):
     # When executing the goal we also check if we need to cancel it
     def excecute_pos_cb(self, goal: ServerGoalHandle):
         self.action_in_progress = True
-        self.take_off = False
 
         self.get_logger().info("Wait for uav initial position...")
         while (len(self.uav_pos.pos) == 0):
@@ -219,45 +219,108 @@ class PositionController(Node):
                 self.arm_uav()
 
             target_pos: UavPos = goal.request.target_pos
+            type = target_pos.type
+
             result = GoToPos.Result()
             feedback = GoToPos.Feedback()
 
             self.get_logger().info('Executing Goal')
             dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
+
+            itr = 0
             
-            while dist > self.pos_delta:
+            while True:
                 if goal.is_cancel_requested:
                     self.get_logger().info('Cancelling goal')
                     goal.canceled()
                     result.success = False 
-                    result.message = f'reached position {self.uav_pos}'
+                    result.message = f'Goal failed: reached position {self.uav_pos}'
                     return result
                 
-                msg = TrajectorySetpoint()
+                if type == UavPos.TAKEOFF:
+                    if itr == 0:
+                        self.get_logger().info('Takeoff initiated')
                         
-                # Check if we've reached takeoff altitude
-                if(math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta) and (self.take_off == False):
-                    self.get_logger().info('Takeoff altitude reached')
-                    self.take_off = True
+                    msg = VehicleCommand()
+                    msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
+                    msg.param7 = target_pos.pos[2]  # Takeoff altitude (NED frame, so negative value)
+                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                    self.vehicle_command_publisher.publish(msg)
+
+                    if (math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
+                        self.get_logger().info('Takeoff complete')
+                        result.success = True
+                        result.message = 'Takeoff complete'
+                        self.uav_airborn = True
+                        self.last_pos_cmd = target_pos
+                        break
                 
-                # If at takeoff altitude, start waypoint navigation
-                if (self.take_off == True):
-                        msg.position = target_pos.pos
-                        msg.yaw = target_pos.yaw
-                        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                        self.trajectory_setpoint_publisher.publish(msg)
-                        
-                        # Check if we're close enough to current waypoint
-                        distance = self.distance_2d(target_pos.pos, self.uav_pos.pos) 
-                else:
-                    # Still taking off - hold horizontal position, climb to altitude
-                    self.get_logger().info(f'Taking off: climbing to {target_pos.pos[2]} m, hold pos x:{self.uav_pos.pos[0]}, y:{self.uav_pos.pos[1]}')
-                    msg.position = [float(self.uav_pos.pos[0]), 
-                                    float(self.uav_pos.pos[1]), 
-                                    float(target_pos.pos[2])]
-                    msg.yaw = 0.0  
+                elif type == UavPos.WAYPOINT:
+                    if itr == 0:
+                        self.get_logger().info(f'Navigating to waypoint: {target_pos.pos}')
+                    
+                    msg = TrajectorySetpoint()
+                    msg.position = target_pos.pos
+                    msg.yaw = target_pos.yaw
                     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                     self.trajectory_setpoint_publisher.publish(msg)
+
+                    dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
+
+                    if dist < self.pos_delta:
+                        self.get_logger().info(f'Waypoint reached: {target_pos.pos}')
+                        result.success = True
+                        result.message = f'Waypoint reached: {target_pos.pos}'
+                        self.last_pos_cmd = target_pos
+                        break
+
+                elif type == UavPos.LAND:
+                    if itr == 0:
+                        self.get_logger().info('Landing initiated')
+                    
+                    msg = VehicleCommand()
+                    msg.command = VehicleCommand.VEHICLE_CMD_NAV_LAND
+                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                    self.vehicle_command_publisher.publish(msg)
+
+                    if (math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
+                        self.get_logger().info('Landing complete')
+                        result.success = True
+                        result.message = 'Landing complete'
+                        self.uav_airborn = False
+                        self.last_pos_cmd = target_pos
+                        break
+                else:
+                    self.get_logger().error('Unknown position command type')
+                    result.success = False
+                    result.message = 'Unknown position command type'
+                    goal.canceled()
+                    return result
+                # msg = TrajectorySetpoint()
+                        
+                # # Check if we've reached takeoff altitude
+                # if(math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta) and (self.uav_airborn == False):
+                #     self.get_logger().info('Takeoff altitude reached')
+                #     self.uav_airborn = True
+                
+                # # If at takeoff altitude, start waypoint navigation
+                # if (self.uav_airborn == True):
+                #         msg.position = target_pos.pos
+                #         msg.yaw = target_pos.yaw
+                #         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                #         self.trajectory_setpoint_publisher.publish(msg)
+                        
+                #         # Check if we're close enough to current waypoint
+                #         distance = self.distance_2d(target_pos.pos, self.uav_pos.pos) 
+                # else:
+                #     # Still taking off - hold horizontal position, climb to altitude
+                #     self.get_logger().info(f'Taking off: climbing to {target_pos.pos[2]} m, hold pos x:{self.uav_pos.pos[0]}, y:{self.uav_pos.pos[1]}')
+                #     msg.position = [float(self.uav_pos.pos[0]), 
+                #                     float(self.uav_pos.pos[1]), 
+                #                     float(target_pos.pos[2])]
+                #     msg.yaw = 0.0  
+                #     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                #     self.trajectory_setpoint_publisher.publish(msg)
                 
                 dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
                 cp = UavPos()
@@ -266,11 +329,11 @@ class PositionController(Node):
                 feedback.current_pos = cp
                 goal.publish_feedback(feedback)
 
+                itr = itr + 1
                 self.rate.sleep()
             
+            self.get_logger().info('Goal execution complete')
             goal.succeed()
-            result.success = True
-            result.message = f'reached position {self.uav_pos}'
             return result
         
         finally:
@@ -284,8 +347,13 @@ class PositionController(Node):
             if not self.action_in_progress and self.armed:
                 # If no action is in progress, hold current position
                 msg = TrajectorySetpoint()
-                msg.position = self.uav_pos.pos
-                msg.yaw = 0.0
+
+                if len(self.last_pos_cmd.pos) == 0:
+                    self.last_pos_cmd = self.uav_pos
+                    self.last_pos_cmd.stamp = self.get_clock().now().nanoseconds / 1000
+
+                msg.position = self.last_pos_cmd.pos
+                msg.yaw = self.last_pos_cmd.yaw
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
 
