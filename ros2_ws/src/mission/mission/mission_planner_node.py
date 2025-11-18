@@ -14,10 +14,9 @@ class MissionPlannerClientNode(Node):
 
     mission_states = {
         "TAKE_OFF"    : 0,
-        "HOVER"       : 1,
-        "WAYPOINT"    : 2,
-        "LAND"        : 3,
-        "RETURN_HOME" : 4,
+        "WAYPOINT"    : 1,
+        "LAND"        : 2,
+        "RETURN_HOME" : 3,
     }
 
     def __init__(self):

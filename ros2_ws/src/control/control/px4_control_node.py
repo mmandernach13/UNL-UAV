@@ -184,12 +184,24 @@ class PositionController(Node):
            (new_pos.pos[2] == self.uav_pos.pos[2]):
             self.get_logger().info('REJECT already at requested position')
             return GoalResponse.REJECT
-        elif new_pos.pos[2] > 0:
+        elif new_pos.pos[2] < 0:
             self.get_logger().info('REJECT height request is out of bounds')
             return GoalResponse.REJECT
-        # elif new_pos.stamp.nanosec > self.get_clock().now().nanoseconds:
-        #     self.get_logger().info('REJECT time stamp of request is in the past')
-        #     return GoalResponse.REJECT
+        elif new_pos.stamp > int(self.get_clock().now().nanoseconds / 1000):
+            self.get_logger().info('REJECT time stamp of request is in the past')
+            return GoalResponse.REJECT
+        elif new_pos.type not in [UavPos.TAKEOFF, UavPos.WAYPOINT, UavPos.LAND]:
+            self.get_logger().info('REJECT unknown position command type')
+            return GoalResponse.REJECT
+        elif (new_pos.type == UavPos.LAND) and (self.uav_airborn == False):
+            self.get_logger().info('REJECT cannot land when already on ground')
+            return GoalResponse.REJECT
+        elif (new_pos.type == UavPos.TAKEOFF) and (self.uav_airborn == True):
+            self.get_logger().info('REJECT cannot takeoff when already airborn')
+            return GoalResponse.REJECT
+        elif (self.uav_airborn == False) and (new_pos.type == UavPos.WAYPOINT):
+            self.get_logger().info('REJECT cannot go to waypoint when not airborn')
+            return GoalResponse.REJECT
         
         self.get_logger().info(f'ACCEPT goal for UavPos: {new_pos.pos}')
         return GoalResponse.ACCEPT 
@@ -239,16 +251,18 @@ class PositionController(Node):
                 
                 if type == UavPos.TAKEOFF:
                     if itr == 0:
-                        self.get_logger().info('Takeoff initiated')
+                        self.get_logger().info(f'Takeoff initiated: climbing to altitude {-target_pos.pos[2]} m')
                         
-                    msg = VehicleCommand()
-                    msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
-                    msg.param7 = target_pos.pos[2]  # Takeoff altitude (NED frame, so negative value)
-                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                    self.vehicle_command_publisher.publish(msg)
+                        msg = VehicleCommand()
+                        msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
+                        msg.param7 = float(target_pos.pos[2])
+                        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                        self.vehicle_command_publisher.publish(msg)
 
+                    self.get_logger().info(f'At altitude {-self.uav_pos.pos[2]} m')
+                    
                     if (math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
-                        self.get_logger().info('Takeoff complete')
+                        self.get_logger().info(f'Takeoff complete: reached altitude {target_pos.pos[2]} m')
                         result.success = True
                         result.message = 'Takeoff complete'
                         self.uav_airborn = True
@@ -260,8 +274,10 @@ class PositionController(Node):
                         self.get_logger().info(f'Navigating to waypoint: {target_pos.pos}')
                     
                     msg = TrajectorySetpoint()
-                    msg.position = target_pos.pos
-                    msg.yaw = target_pos.yaw
+                    msg.position = [float(target_pos.pos[0]), 
+                                    float(target_pos.pos[1]), 
+                                    float(-target_pos.pos[2])] # NED frame uses negative z for altitude
+                    msg.yaw = float(target_pos.yaw)
                     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                     self.trajectory_setpoint_publisher.publish(msg)
 

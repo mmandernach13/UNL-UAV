@@ -1,6 +1,6 @@
 # UavPos Type Constants
 uint8 TAKEOFF = 0
-uint8 GOTO = 1
+uint8 WAYPOINT = 1
 uint8 LAND = 2
 
 uint64 stamp  
