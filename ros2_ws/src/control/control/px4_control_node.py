@@ -143,6 +143,11 @@ class PositionController(Node):
                 cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
                 cmd_msg.param1 = 1.0  # Custom mode enabled
                 cmd_msg.param2 = 6.0  # Offboard mode (PX4_CUSTOM_MAIN_MODE_OFFBOARD)
+                cmd_msg.target_system = 1
+                cmd_msg.target_component = 1
+                cmd_msg.source_system = 1
+                cmd_msg.source_component = 1
+                cmd_msg.from_external = True
                 cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.vehicle_command_publisher.publish(cmd_msg)
             itr = itr + 1 
@@ -155,17 +160,18 @@ class PositionController(Node):
         cmd_msg = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
         cmd_msg.param1 = 1.0 # 1 to arm, 0 to disarm
+        cmd_msg.target_system = 1
+        cmd_msg.target_component = 1
+        cmd_msg.source_system = 1
+        cmd_msg.source_component = 1
+        cmd_msg.from_external = True
         
-        max_attempts = 100
-        attempts = 0
-        
-        while (self.armed == False) and (attempts < max_attempts):
-            self.get_logger().info(f'Attempting to arm... (attempt {attempts})')
+        while self.armed == False:
+            self.get_logger().info('Attempting to arm...')
 
             cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
             self.vehicle_command_publisher.publish(cmd_msg)
            
-            attempts += 1
             self.rate.sleep()
         
         if self.armed:
@@ -251,7 +257,7 @@ class PositionController(Node):
                 
                 if type == UavPos.TAKEOFF:
                     if itr == 0:
-                        self.get_logger().info(f'Takeoff initiated: climbing to altitude {-target_pos.pos[2]} m')
+                        self.get_logger().info(f'Takeoff initiated: climbing to altitude {target_pos.pos[2]} m')
                         
                         msg = VehicleCommand()
                         msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
@@ -259,8 +265,8 @@ class PositionController(Node):
                         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                         self.vehicle_command_publisher.publish(msg)
 
-                    self.get_logger().info(f'At altitude {-self.uav_pos.pos[2]} m')
-                    
+                    self.get_logger().info(f'At altitude {self.uav_pos.pos[2]} m')
+
                     if (math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
                         self.get_logger().info(f'Takeoff complete: reached altitude {target_pos.pos[2]} m')
                         result.success = True
