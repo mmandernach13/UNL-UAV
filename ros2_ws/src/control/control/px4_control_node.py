@@ -32,6 +32,7 @@ class PositionController(Node):
         # State variables to track UAV status
         self.uav_pos = UavPos()  # Current [x, y, z], yaw position of UAV
         self.last_pos_cmd = UavPos()  # Last position command sent to UAV
+        self.mission_state = -1    # Current mission state
         self.uav_airborn = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
         self.armed = False  # Flag: Are motors armed?
@@ -90,6 +91,14 @@ class PositionController(Node):
             qos_profile
         )
         self.get_logger().info('Status sub created')
+
+        self.mission_state_sub = self.create_subscription(
+            MissionState, 
+            '/mission/mission_state', 
+            self.mission_state_cb, 
+            qos_profile
+        )
+        self.get_logger().info('Mission state sub created')
 
         # PUBLISHERS - Send commands and setpoints to PX4
         # Send high-level commands (arm, disarm, mode changes, land, etc.)
@@ -233,7 +242,6 @@ class PositionController(Node):
         try:
 
             target_pos: UavPos = request.target_pos
-            target_state = request.state
             type = target_pos.type
 
             result = GoToPos.Result()
@@ -242,7 +250,7 @@ class PositionController(Node):
             self.get_logger().info('Executing Goal')
             dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
 
-            if target_state.state == MissionState.MODE_CONTROL:
+            if self.mission_state == MissionState.MODE_CONTROL:
                 self.get_logger().info('In MODE_CONTROL state')
                 # enter into mode control - no arming/offboard
 
@@ -255,11 +263,8 @@ class PositionController(Node):
                 elif type == UavPos.LAND:
                     self.get_logger().info('Land command received')
 
-                elif type == UavPos.RTL:
-                    self.get_logger().info('Return to Launch command received')
 
-
-            elif target_state.state == MissionState.OFFBOARD:
+            elif self.mission_state == MissionState.OFFBOARD:
 
                 if (self.offboard_enable == False):
                     self.enter_offboard_mode()
@@ -401,17 +406,21 @@ class PositionController(Node):
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
 
+    def mission_state_cb(self, msg : MissionState):
+        self.mission_state = msg.state
+        self.get_logger().info(f'Mission state updated: {self.mission_state}')
+
     # CALLBACK: Update armed status from vehicle status
-    def status_cb(self, status):
+    def status_cb(self, status : VehicleStatus):
         # arming_state == 2 means ARMED
         self.armed = True if status.arming_state == 2 else False
         
     # CALLBACK: Update offboard mode status
-    def vehicle_control_mode_cb(self, mode):
+    def vehicle_control_mode_cb(self, mode : VehicleControlMode):
         self.offboard_enable = mode.flag_control_offboard_enabled
 
     # CALLBACK: Update current position
-    def vehicle_local_position_cb(self, local_pos):
+    def vehicle_local_position_cb(self, local_pos : VehicleLocalPosition):
         # Store position in NED frame (North, East, Down)
         self.uav_pos.pos = [local_pos.x, local_pos.y, local_pos.z]
         self.uav_pos.stamp = local_pos.timestamp
@@ -427,17 +436,7 @@ class PositionController(Node):
         return math.sqrt(dx*dx + dy*dy)
 
     def distance_3d(self, pos1, pos2):
-        """
-        Calculate 3D Euclidean distance between two positions.
-        
-        Args:
-            pos1: List/tuple of [x, y, z] or object with .x, .y, .z attributes
-            pos2: List/tuple of [x, y, z] or object with .x, .y, .z attributes
-        
-        Returns:
-            float: Distance in meters
-        """
-        # Handle list/tuple input
+
         x1, y1, z1 = pos1[0], pos1[1], pos1[2]
         x2, y2, z2 = pos2[0], pos2[1], pos2[2]
         

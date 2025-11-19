@@ -1,5 +1,4 @@
 # Goal - where to go
-uav_interfaces/msg/MissionState state
 uav_interfaces/msg/UavPos target_pos
 ---
 # Result - did we make it?
