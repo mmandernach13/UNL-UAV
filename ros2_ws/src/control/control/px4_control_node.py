@@ -9,7 +9,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
-from uav_interfaces.msg import UavPos 
+from uav_interfaces.msg import UavPos, MissionState 
 from uav_interfaces.action import GoToPos
 import math
 
@@ -52,7 +52,7 @@ class PositionController(Node):
         self.action_server = ActionServer(
             self, 
             GoToPos,
-            'go_to_position',
+            'control/execute_movement',
             goal_callback=self.goal_pos_cb,
             cancel_callback=self.cancel_pos_cb,
             execute_callback=self.excecute_pos_cb,
@@ -223,6 +223,7 @@ class PositionController(Node):
     # When executing the goal we also check if we need to cancel it
     def excecute_pos_cb(self, goal: ServerGoalHandle):
         self.action_in_progress = True
+        request = goal.request
 
         self.get_logger().info("Wait for uav initial position...")
         while (len(self.uav_pos.pos) == 0):
@@ -230,13 +231,9 @@ class PositionController(Node):
         self.get_logger().info("position received")
 
         try:
-            if (self.offboard_enable == False):
-                self.enter_offboard_mode()
 
-            if (self.armed == False):
-                self.arm_uav()
-
-            target_pos: UavPos = goal.request.target_pos
+            target_pos: UavPos = request.target_pos
+            target_state = request.state
             type = target_pos.type
 
             result = GoToPos.Result()
@@ -244,6 +241,31 @@ class PositionController(Node):
 
             self.get_logger().info('Executing Goal')
             dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
+
+            if target_state.state == MissionState.MODE_CONTROL:
+                self.get_logger().info('In MODE_CONTROL state')
+                # enter into mode control - no arming/offboard
+
+                if type == UavPos.TAKEOFF:
+                    self.get_logger().info('Takeoff command received')
+
+                elif type == UavPos.WAYPOINT:
+                    self.get_logger().info('Waypoint command received')
+
+                elif type == UavPos.LAND:
+                    self.get_logger().info('Land command received')
+
+                elif type == UavPos.RTL:
+                    self.get_logger().info('Return to Launch command received')
+
+
+            elif target_state.state == MissionState.OFFBOARD:
+
+                if (self.offboard_enable == False):
+                    self.enter_offboard_mode()
+
+                if (self.armed == False):
+                    self.arm_uav()
 
             itr = 0
             

@@ -6,23 +6,18 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle, GoalStatus
 from uav_interfaces.action import GoToPos
-from uav_interfaces.msg import UavPos
+from uav_interfaces.msg import UavPos, MissionState
 import numpy as np
 
 
-class MissionPlannerClientNode(Node):
-
-    mission_states = {
-        "TAKE_OFF"    : 0,
-        "WAYPOINT"    : 1,
-        "LAND"        : 2,
-        "RETURN_HOME" : 3,
-    }
+class MissionPlannerClientNode(Node): 
 
     def __init__(self):
         super().__init__("mission_planner_client_node")
-        self.mission_planner_client = ActionClient(self, GoToPos, "go_to_position")
+        self.mission_planner_client = ActionClient(self, GoToPos, "control/execute_movement")
         self.get_logger().info("Mission Planner Client Node has been started.")
+
+        self.mission_state = MissionState.IDLE
         
         self.mission_dir = os.getcwd() + "/src/mission/mission_files/"
     
@@ -51,10 +46,6 @@ class MissionPlannerClientNode(Node):
         result = future.result().result
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info("Success")
-            global pts, idx
-            idx += 1
-            if idx < len(pts):
-                self.send_goal(pts[idx])
         elif status == GoalStatus.STATUS_ABORTED:
             self.get_logger().error("Aborted")
         elif status == GoalStatus.STATUS_CANCELED:
@@ -64,26 +55,27 @@ class MissionPlannerClientNode(Node):
     def goal_feedback_callback(self, feedback_msg):
         feedback = feedback_msg.feedback
         self.get_logger().info("Got feedback: " + str(feedback.distance_remaining))
-
-    def get_waypoints_txt(self, filename: str):
-        filename = self.mission_dir + filename
-        waypoints = np.loadtxt(filename, delimiter=',') # csv format x, y, z, yaw, type
-        return waypoints
         
     def run_mission(self, filename: str = "ex_mission.txt"):
-        global pts, idx
-        waypoints = self.get_waypoints_txt(filename)
-        pts = []
-        for wp in waypoints:
-            pos = UavPos()
-            pos.pos[0] = float(wp[0])
-            pos.pos[1] = float(wp[1])
-            pos.pos[2] = float(wp[2])
-            pos.yaw = float(wp[3])
-            pos.type = int(wp[4])
-            pts.append(pos)
-        idx = 0
-        self.send_goal(pts[idx])
+        mission_done = False
+
+        while not mission_done:
+            
+            if self.mission_state == MissionState.INITIAL:
+                self.get_logger().info("Mission State: INITIAL")
+                mission_file_path = self.mission_dir + filename
+
+            elif self.mission_state == MissionState.IDLE:
+                self.get_logger().info("Mission State: IDLE")
+
+            elif self.mission_state == MissionState.MODE_CONTROL:
+                self.get_logger().info("Mission State: MODE_CONTROL")
+
+            elif self.mission_state == MissionState.OFFBOARD:
+                self.get_logger().info("Mission State: OFFBOARD")
+
+            elif self.mission_state == MissionState.SCAN:
+                self.get_logger().info("Mission State: SCAN")
 
 
 def main(args=None):

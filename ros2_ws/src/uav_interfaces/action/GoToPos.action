@@ -1,5 +1,6 @@
 # Goal - where to go
-uav_interfaces/UavPos target_pos
+uav_interfaces/msg/MissionState state
+uav_interfaces/msg/UavPos target_pos
 ---
 # Result - did we make it?
 bool success
@@ -7,4 +8,4 @@ string message  # "Reached waypoint" or "Cancelled due to obstacle"
 ---
 # Feedback - progress updates
 float32 distance_remaining
-uav_interfaces/UavPos current_pos
+uav_interfaces/msg/UavPos current_pos
