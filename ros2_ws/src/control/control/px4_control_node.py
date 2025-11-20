@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import time
+from typing import Tuple
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
@@ -9,19 +11,16 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
-from uav_interfaces.msg import UavPos, MissionState 
+from uav_interfaces.msg import UavPos, MissionState
 from uav_interfaces.action import GoToPos
 import math
 
 
 class PositionController(Node):
-    def __init__(self): 
+    def __init__(self) -> None:
         super().__init__('position_control')
-        
-        # QoS Profile - Quality of Service settings for reliable PX4 communication
-        # BEST_EFFORT: Don't guarantee delivery (faster, PX4 uses this)
-        # TRANSIENT_LOCAL: New subscribers get last published message
-        # KEEP_LAST with depth=1: Only keep most recent message
+
+        # QoS Profile for reliable communication with PX4
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
@@ -29,424 +28,370 @@ class PositionController(Node):
             depth=1
         )
 
-        # State variables to track UAV status
-        self.uav_pos = UavPos()  # Current [x, y, z], yaw position of UAV
-        self.last_pos_cmd = UavPos()  # Last position command sent to UAV
-        self.mission_state = -1    # Current mission state
-        self.uav_airborn = False   # Flag: Has UAV reached takeoff altitude?
-        self.offboard_enable = False  # Flag: Is offboard mode active?
-        self.armed = False  # Flag: Are motors armed?
-        self.action_in_progress = False  # Flag: Is an action currently being executed?
-        global offboard_signal_msg
-        offboard_signal_msg = OffboardControlMode()
+        # --- State Variables ---
+        self.uav_pos: UavPos = UavPos()
+        self.last_pos_cmd: UavPos = UavPos()
+        self.mission_state: int = -1
+        self.uav_airborn: bool = False
+        self.offboard_enable: bool = False
+        self.armed: bool = False
+        self.action_in_progress: bool = False
+        self.offboard_signal_msg: OffboardControlMode = OffboardControlMode()
 
+        # --- Parameters ---
         self.declare_parameter('loop_rate', 10.0)
-        self.loop_freq = self.get_parameter('loop_rate').value
+        self.loop_freq: float = self.get_parameter('loop_rate').value
         self.rate = self.create_rate(self.loop_freq)
 
         self.declare_parameter('offboard_rate', 5.0)
-        self.offboard_rate = self.get_parameter('offboard_rate').value 
+        self.offboard_rate: float = self.get_parameter('offboard_rate').value
 
         self.declare_parameter('pos_delta', 0.3)
-        self.pos_delta = self.get_parameter('pos_delta').value 
+        self.pos_delta: float = self.get_parameter('pos_delta').value
 
-        self.action_server = ActionServer(
-            self, 
+        # --- Action Server ---
+        self.action_server: ActionServer = ActionServer(
+            self,
             GoToPos,
             'control/execute_movement',
             goal_callback=self.goal_pos_cb,
             cancel_callback=self.cancel_pos_cb,
-            execute_callback=self.excecute_pos_cb,
+            execute_callback=self.execute_pos_cb,
             callback_group=ReentrantCallbackGroup())
-        
         self.get_logger().info('Action server started')
 
-        self.maintain_offboard_timer = self.create_timer(1/self.offboard_rate, self.maintain_offboard_cb)
+        # --- Timers ---
+        self.maintain_offboard_timer = self.create_timer(1 / self.offboard_rate, self.maintain_offboard_cb)
         self.get_logger().info('Offboard maintainer started')
 
-        # SUBSCRIBERS - Listen to PX4 status and position
-        # Vehicle position in local North-East-Down (NED) coordinate frame
+        # --- Subscribers ---
         self.vehicle_local_position_sub = self.create_subscription(
-            VehicleLocalPosition, 
-            '/fmu/out/vehicle_local_position_v1', 
-            self.vehicle_local_position_cb, 
-            qos_profile
-        )
+            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_cb, qos_profile)
         self.get_logger().info('Position sub created')
 
-        # Vehicle control mode (tells us if offboard mode is active)
         self.vehicle_control_mode_sub = self.create_subscription(
-            VehicleControlMode, 
-            '/fmu/out/vehicle_control_mode', 
-            self.vehicle_control_mode_cb, 
-            qos_profile
-        )
+            VehicleControlMode, '/fmu/out/vehicle_control_mode', self.vehicle_control_mode_cb, qos_profile)
         self.get_logger().info('Control mode sub created')
 
-        # Vehicle status (arming state, flight mode, etc.)
         self.vehicle_status_sub = self.create_subscription(
-            VehicleStatus, 
-            '/fmu/out/vehicle_status_v1', 
-            self.status_cb, 
-            qos_profile
-        )
+            VehicleStatus, '/fmu/out/vehicle_status', self.status_cb, qos_profile)
         self.get_logger().info('Status sub created')
 
         self.mission_state_sub = self.create_subscription(
-            MissionState, 
-            '/mission/mission_state', 
-            self.mission_state_cb, 
-            qos_profile
-        )
+            MissionState, '/mission/mission_state', self.mission_state_cb, qos_profile)
         self.get_logger().info('Mission state sub created')
 
-        # PUBLISHERS - Send commands and setpoints to PX4
-        # Send high-level commands (arm, disarm, mode changes, land, etc.)
+        # --- Publishers ---
         self.vehicle_command_publisher = self.create_publisher(
-            VehicleCommand, 
-            '/fmu/in/vehicle_command', 
-            qos_profile
-        )
+            VehicleCommand, '/fmu/in/vehicle_command', qos_profile)
         self.get_logger().info('Command pub created')
 
-        # Tell PX4 what control mode we want (position, velocity, attitude, etc.)
-        # Must publish this at >2Hz or PX4 will exit offboard mode
         self.offboard_control_mode_publisher = self.create_publisher(
-            OffboardControlMode, 
-            '/fmu/in/offboard_control_mode', 
-            qos_profile
-        )
+            OffboardControlMode, '/fmu/in/offboard_control_mode', qos_profile)
         self.get_logger().info('Control mode pub created')
 
-        # Send position/velocity setpoints for the UAV to follow
         self.trajectory_setpoint_publisher = self.create_publisher(
-            TrajectorySetpoint, 
-            '/fmu/in/trajectory_setpoint', 
-            qos_profile
-        )
+            TrajectorySetpoint, '/fmu/in/trajectory_setpoint', qos_profile)
         self.get_logger().info('Trajectory pub created')
 
-    def send_offboard_signal(self):
-        offboard_signal_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        self.offboard_control_mode_publisher.publish(offboard_signal_msg)
+    def send_offboard_signal(self) -> None:
+        self.offboard_signal_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+        self.offboard_control_mode_publisher.publish(self.offboard_signal_msg)
 
-    def enter_offboard_mode(self):
-        # Create offboard control mode message
-        # This tells PX4 we want to control POSITION (not velocity/attitude/etc)
-        self.get_logger().info('Going into OFFBOARD mode') 
-        offboard_signal_msg.position = True  # We'll send position setpoints
-        offboard_signal_msg.velocity = False
-        offboard_signal_msg.acceleration = False
-        offboard_signal_msg.attitude = False
-        offboard_signal_msg.body_rate = False
-
-        self.send_offboard_signal()
-
-        itr = 0
-
-        while(self.offboard_enable == False):
-            self.get_logger().info('Requesting OFFBOARD mode')
-            # Wait a bit before requesting (let offboard signal propagate)
-            if(itr > 10):
-                cmd_msg = VehicleCommand()
+    def enter_offboard_mode(self) -> None:
+        self.get_logger().info('Requesting OFFBOARD mode...')
+        self.offboard_signal_msg.position = True
+        self.offboard_signal_msg.velocity = False
+        self.offboard_signal_msg.acceleration = False
+        self.offboard_signal_msg.attitude = False
+        self.offboard_signal_msg.body_rate = False
+        
+        # Continuously send offboard signal and request mode switch
+        itr: int = 0
+        while not self.offboard_enable:
+            self.send_offboard_signal()
+            if itr > 10:
+                cmd_msg: VehicleCommand = VehicleCommand()
                 cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
-                cmd_msg.param1 = 1.0  # Custom mode enabled
-                cmd_msg.param2 = 6.0  # Offboard mode (PX4_CUSTOM_MAIN_MODE_OFFBOARD)
+                cmd_msg.param1 = 1.0  # Custom mode
+                cmd_msg.param2 = 6.0  # Offboard mode
                 cmd_msg.target_system = 1
                 cmd_msg.target_component = 1
-                cmd_msg.source_system = 1
-                cmd_msg.source_component = 1
                 cmd_msg.from_external = True
-                cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
                 self.vehicle_command_publisher.publish(cmd_msg)
-            itr = itr + 1 
+            itr += 1
             self.rate.sleep()
-
         self.get_logger().info('OFFBOARD mode enabled')
 
-    def arm_uav(self):
-        self.get_logger().info('Arming UAV')
-        cmd_msg = VehicleCommand()
+    def arm_uav(self) -> None:
+        self.get_logger().info('Arming UAV...')
+        cmd_msg: VehicleCommand = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
-        cmd_msg.param1 = 1.0 # 1 to arm, 0 to disarm
+        cmd_msg.param1 = 1.0  # 1 to arm
         cmd_msg.target_system = 1
         cmd_msg.target_component = 1
-        cmd_msg.source_system = 1
-        cmd_msg.source_component = 1
-        cmd_msg.from_external = True
         
-        while self.armed == False:
-            self.get_logger().info('Attempting to arm...')
-
-            cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        while not self.armed:
+            cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
             self.vehicle_command_publisher.publish(cmd_msg)
-           
+            self.get_logger().info('Attempting to arm...')
             self.rate.sleep()
         
         if self.armed:
             self.get_logger().info('UAV armed')
         else:
             self.get_logger().error('Failed to arm! Check PX4 console')
+
+    def disarm_uav(self) -> None:
+        self.get_logger().info('Disarming UAV...')
+        cmd_msg: VehicleCommand = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
+        cmd_msg.param1 = 0.0  # 0 to disarm
+        cmd_msg.target_system = 1
+        cmd_msg.target_component = 1
         
-    # Every new received goal will be processed here first
-    # We can decide to accept or reject the incoming goal
-    def goal_pos_cb(self, goal_request: GoToPos.Goal):
+        while self.armed: # Wait until disarmed
+            cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+            self.vehicle_command_publisher.publish(cmd_msg)
+            self.get_logger().info('Attempting to disarm...')
+            self.rate.sleep()
+        
+        if not self.armed:
+            self.get_logger().info('UAV disarmed')
+        else:
+            self.get_logger().error('Failed to disarm! Check PX4 console')
+
+    def goal_pos_cb(self, goal_request: GoToPos.Goal) -> GoalResponse:
+        """Accept or reject a new goal."""
         self.get_logger().info('Position goal received')
-
         new_pos: UavPos = goal_request.target_pos
-        if (new_pos.pos[0] == self.uav_pos.pos[0]) and \
-           (new_pos.pos[1] == self.uav_pos.pos[1]) and \
-           (new_pos.pos[2] == self.uav_pos.pos[2]):
-            self.get_logger().info('REJECT already at requested position')
-            return GoalResponse.REJECT
-        elif new_pos.pos[2] < 0:
-            self.get_logger().info('REJECT height request is out of bounds')
-            return GoalResponse.REJECT
-        elif new_pos.stamp > int(self.get_clock().now().nanoseconds / 1000):
-            self.get_logger().info('REJECT time stamp of request is in the past')
-            return GoalResponse.REJECT
-        elif new_pos.type not in [UavPos.TAKEOFF, UavPos.WAYPOINT, UavPos.LAND]:
-            self.get_logger().info('REJECT unknown position command type')
-            return GoalResponse.REJECT
-        elif (new_pos.type == UavPos.LAND) and (self.uav_airborn == False):
-            self.get_logger().info('REJECT cannot land when already on ground')
-            return GoalResponse.REJECT
-        elif (new_pos.type == UavPos.TAKEOFF) and (self.uav_airborn == True):
-            self.get_logger().info('REJECT cannot takeoff when already airborn')
-            return GoalResponse.REJECT
-        elif (self.uav_airborn == False) and (new_pos.type == UavPos.WAYPOINT):
-            self.get_logger().info('REJECT cannot go to waypoint when not airborn')
-            return GoalResponse.REJECT
-        
-        self.get_logger().info(f'ACCEPT goal for UavPos: {new_pos.pos}')
-        return GoalResponse.ACCEPT 
 
-    # Any cancel request will be processed here, we can accept or reject it
-    def cancel_pos_cb(self, goal_handle: ServerGoalHandle):
-        self.get_logger().info('Received cancel request')
-        # put in hover or land mode
+        # Basic validation
+        if any(math.isnan(c) for c in new_pos.pos):
+             self.get_logger().warn('REJECT: Goal contains NaN values.')
+             return GoalResponse.REJECT
+        if new_pos.type not in [UavPos.UAV_POS_TYPE_TAKEOFF, UavPos.UAV_POS_TYPE_WAYPOINT, UavPos.UAV_POS_TYPE_LAND, UavPos.UAV_POS_TYPE_PAYLOAD_DROP]:
+            self.get_logger().warn(f'REJECT: Unknown position command type: {new_pos.type}')
+            return GoalResponse.REJECT
+        if (new_pos.type == UavPos.UAV_POS_TYPE_LAND) and not self.uav_airborn:
+            self.get_logger().warn('REJECT: Cannot land when already on ground')
+            return GoalResponse.REJECT
+        if (new_pos.type == UavPos.UAV_POS_TYPE_TAKEOFF) and self.uav_airborn:
+            self.get_logger().warn('REJECT: Cannot takeoff when already airborne')
+            return GoalResponse.REJECT
+        if not self.uav_airborn and new_pos.type == UavPos.UAV_POS_TYPE_WAYPOINT:
+            self.get_logger().warn('REJECT: Cannot go to waypoint when not airborne')
+            return GoalResponse.REJECT
+
+        self.get_logger().info(f'ACCEPT: Goal for UavPos: {new_pos.pos}')
+        return GoalResponse.ACCEPT
+
+    def cancel_pos_cb(self, goal_handle: ServerGoalHandle) -> CancelResponse:
+        """Handle cancel requests."""
+        self.get_logger().info('Received cancel request. Switching to hover/loiter.')
+        # TODO: Implement a safe hover/loiter command here
         return CancelResponse.ACCEPT
 
-    # If a goal has been accepted, it will then be executed in this callback
-    # After we are done with the goal execution we set a final state and return the result
-    # When executing the goal we also check if we need to cancel it
-    def excecute_pos_cb(self, goal: ServerGoalHandle):
+    def execute_pos_cb(self, goal_handle: ServerGoalHandle) -> GoToPos.Result:
+        """Execute the accepted goal."""
         self.action_in_progress = True
-        request = goal.request
-
-        self.get_logger().info("Wait for uav initial position...")
-        while (len(self.uav_pos.pos) == 0):
-             time.sleep(0.1)
-        self.get_logger().info("position received")
+        self.get_logger().info("Executing goal...")
 
         try:
+            target_pos: UavPos = goal_handle.request.target_pos
+            result: GoToPos.Result = GoToPos.Result()
 
-            target_pos: UavPos = request.target_pos
-            type = target_pos.type
-
-            result = GoToPos.Result()
-            feedback = GoToPos.Feedback()
-
-            self.get_logger().info('Executing Goal')
-            dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
-
-            if self.mission_state == MissionState.MODE_CONTROL:
-                self.get_logger().info('In MODE_CONTROL state')
-                # enter into mode control - no arming/offboard
-
-                if type == UavPos.TAKEOFF:
-                    self.get_logger().info('Takeoff command received')
-
-                elif type == UavPos.WAYPOINT:
-                    self.get_logger().info('Waypoint command received')
-
-                elif type == UavPos.LAND:
-                    self.get_logger().info('Land command received')
-
-
-            elif self.mission_state == MissionState.OFFBOARD:
-
-                if (self.offboard_enable == False):
+            # --- Pre-flight checks and setup ---
+            if self.mission_state == MissionState.OFFBOARD:
+                if not self.offboard_enable:
                     self.enter_offboard_mode()
-
-                if (self.armed == False):
+                if not self.armed:
                     self.arm_uav()
-
-            itr = 0
             
-            while True:
-                if goal.is_cancel_requested:
-                    self.get_logger().info('Cancelling goal')
-                    goal.canceled()
-                    result.success = False 
-                    result.message = f'Goal failed: reached position {self.uav_pos}'
-                    return result
-                
-                if type == UavPos.TAKEOFF:
-                    if itr == 0:
-                        self.get_logger().info(f'Takeoff initiated: climbing to altitude {target_pos.pos[2]} m')
-                        
-                        msg = VehicleCommand()
-                        msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
-                        msg.param7 = float(target_pos.pos[2])
-                        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                        self.vehicle_command_publisher.publish(msg)
-
-                    self.get_logger().info(f'At altitude {self.uav_pos.pos[2]} m')
-
-                    if (math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
-                        self.get_logger().info(f'Takeoff complete: reached altitude {target_pos.pos[2]} m')
-                        result.success = True
-                        result.message = 'Takeoff complete'
-                        self.uav_airborn = True
-                        self.last_pos_cmd = target_pos
-                        break
-                
-                elif type == UavPos.WAYPOINT:
-                    if itr == 0:
-                        self.get_logger().info(f'Navigating to waypoint: {target_pos.pos}')
-                    
-                    msg = TrajectorySetpoint()
-                    msg.position = [float(target_pos.pos[0]), 
-                                    float(target_pos.pos[1]), 
-                                    float(-target_pos.pos[2])] # NED frame uses negative z for altitude
-                    msg.yaw = float(target_pos.yaw)
-                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                    self.trajectory_setpoint_publisher.publish(msg)
-
-                    dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
-
-                    if dist < self.pos_delta:
-                        self.get_logger().info(f'Waypoint reached: {target_pos.pos}')
-                        result.success = True
-                        result.message = f'Waypoint reached: {target_pos.pos}'
-                        self.last_pos_cmd = target_pos
-                        break
-
-                elif type == UavPos.LAND:
-                    if itr == 0:
-                        self.get_logger().info('Landing initiated')
-                    
-                    msg = VehicleCommand()
-                    msg.command = VehicleCommand.VEHICLE_CMD_NAV_LAND
-                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                    self.vehicle_command_publisher.publish(msg)
-
-                    if (math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta):
-                        self.get_logger().info('Landing complete')
-                        result.success = True
-                        result.message = 'Landing complete'
-                        self.uav_airborn = False
-                        self.last_pos_cmd = target_pos
-                        break
-                else:
-                    self.get_logger().error('Unknown position command type')
+            # --- Main Execution Loop ---
+            while rclpy.ok():
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
                     result.success = False
-                    result.message = 'Unknown position command type'
-                    goal.canceled()
+                    result.message = 'Goal was canceled.'
+                    self.get_logger().info(result.message)
                     return result
-                # msg = TrajectorySetpoint()
-                        
-                # # Check if we've reached takeoff altitude
-                # if(math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta) and (self.uav_airborn == False):
-                #     self.get_logger().info('Takeoff altitude reached')
-                #     self.uav_airborn = True
-                
-                # # If at takeoff altitude, start waypoint navigation
-                # if (self.uav_airborn == True):
-                #         msg.position = target_pos.pos
-                #         msg.yaw = target_pos.yaw
-                #         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                #         self.trajectory_setpoint_publisher.publish(msg)
-                        
-                #         # Check if we're close enough to current waypoint
-                #         distance = self.distance_2d(target_pos.pos, self.uav_pos.pos) 
-                # else:
-                #     # Still taking off - hold horizontal position, climb to altitude
-                #     self.get_logger().info(f'Taking off: climbing to {target_pos.pos[2]} m, hold pos x:{self.uav_pos.pos[0]}, y:{self.uav_pos.pos[1]}')
-                #     msg.position = [float(self.uav_pos.pos[0]), 
-                #                     float(self.uav_pos.pos[1]), 
-                #                     float(target_pos.pos[2])]
-                #     msg.yaw = 0.0  
-                #     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                #     self.trajectory_setpoint_publisher.publish(msg)
-                
-                dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
-                cp = UavPos()
-                cp = self.uav_pos
-                feedback.distance_remaining = dist
-                feedback.current_pos = cp
-                goal.publish_feedback(feedback)
 
-                itr = itr + 1
+                # Choose handler based on position type
+                success: bool = False
+                message: str = ""
+                if target_pos.type == UavPos.UAV_POS_TYPE_TAKEOFF:
+                    success, message = self._handle_takeoff(goal_handle, target_pos)
+                elif target_pos.type == UavPos.UAV_POS_TYPE_WAYPOINT:
+                    success, message = self._handle_waypoint(goal_handle, target_pos)
+                elif target_pos.type == UavPos.UAV_POS_TYPE_LAND:
+                    success, message = self._handle_land(goal_handle, target_pos)
+                elif target_pos.type == UavPos.UAV_POS_TYPE_PAYLOAD_DROP:
+                    # TODO: Implement payload drop logic
+                    self.get_logger().info("Payload drop requested. (Logic not yet implemented)")
+                    success, message = True, "Payload drop command received (logic not implemented)"
+                else:
+                    success, message = False, "Unknown position command type"
+
+                # If handler returns, the action is complete (or failed)
+                if success:
+                    result.success = success
+                    result.message = message
+                    goal_handle.succeed()
+                    self.get_logger().info(f"Goal succeeded: {message}")
+                    return result
+                elif not success and message: # If failed and message provided
+                    result.success = success
+                    result.message = message
+                    # No explicit abort, just return failure
+                    self.get_logger().error(f"Goal failed: {message}")
+                    return result
+                
                 self.rate.sleep()
-            
-            self.get_logger().info('Goal execution complete')
-            goal.succeed()
-            return result
-        
+
         finally:
             self.action_in_progress = False
-   
-    # CALLBACK: maintains offboard control (have to publish at >2Hz)
-    def maintain_offboard_cb(self):
+            self.get_logger().info("Goal execution finished.")
+
+    def _handle_takeoff(self, goal_handle: ServerGoalHandle, target_pos: UavPos) -> Tuple[bool, str]:
+        """Private method to handle takeoff using VEHICLE_CMD_NAV_TAKEOFF."""
+        self.get_logger().info(f'Takeoff initiated: climbing to altitude {-target_pos.pos[2]}m')
+        
+        cmd_msg: VehicleCommand = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
+        cmd_msg.param7 = -target_pos.pos[2]  # Target altitude (positive value)
+        cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+        self.vehicle_command_publisher.publish(cmd_msg)
+
+        # Monitor altitude
+        while rclpy.ok() and math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) > self.pos_delta:
+            if goal_handle.is_cancel_requested:
+                return False, "Takeoff canceled"
+            feedback: GoToPos.Feedback = GoToPos.Feedback(
+                distance_remaining=math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]),
+                current_pos=self.uav_pos
+            )
+            goal_handle.publish_feedback(feedback)
+            self.rate.sleep()
+
+        self.uav_airborn = True
+        self.last_pos_cmd = target_pos
+        return True, "Takeoff complete"
+
+    def _handle_waypoint(self, goal_handle: ServerGoalHandle, target_pos: UavPos) -> Tuple[bool, str]:
+        """Private method to handle waypoint navigation based on mission state."""
+        self.get_logger().info(f'Navigating to waypoint: {target_pos.pos}')
+        
+        # --- Conditional Waypoint Logic ---
+        if self.mission_state == MissionState.OFFBOARD:
+            # Use Trajectory Setpoints for precise offboard control
+            self.get_logger().info("Using Trajectory Setpoints for waypoint navigation.")
+            while rclpy.ok() and self.distance_3d(target_pos.pos, self.uav_pos.pos) > self.pos_delta:
+                if goal_handle.is_cancel_requested:
+                    return False, "Waypoint navigation canceled"
+
+                setpoint_msg: TrajectorySetpoint = TrajectorySetpoint()
+                setpoint_msg.position = [target_pos.pos[0], target_pos.pos[1], target_pos.pos[2]]
+                setpoint_msg.yaw = target_pos.yaw
+                setpoint_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+                self.trajectory_setpoint_publisher.publish(setpoint_msg)
+
+                feedback: GoToPos.Feedback = GoToPos.Feedback(
+                    distance_remaining=self.distance_3d(target_pos.pos, self.uav_pos.pos),
+                    current_pos=self.uav_pos
+                )
+                goal_handle.publish_feedback(feedback)
+                self.rate.sleep()
+
+        elif self.mission_state == MissionState.MODE_CONTROL:
+            # Use Vehicle Commands to let PX4 handle waypoint navigation
+            self.get_logger().info("Using Vehicle Command for waypoint navigation.")
+            cmd_msg: VehicleCommand = VehicleCommand()
+            cmd_msg.command = VehicleCommand.VEHICLE_CMD_NAV_WAYPOINT
+            cmd_msg.param1 = 0.0  # Hold time in seconds
+            cmd_msg.param2 = 0.0  # Acceptance radius in meters
+            cmd_msg.param3 = 0.0  # Pass-through
+            cmd_msg.param4 = target_pos.yaw
+            cmd_msg.param5 = target_pos.pos[0] # Latitude / X
+            cmd_msg.param6 = target_pos.pos[1] # Longitude / Y
+            cmd_msg.param7 = -target_pos.pos[2] # Altitude (positive)
+            cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+            self.vehicle_command_publisher.publish(cmd_msg)
+
+            # Monitor distance to target
+            while rclpy.ok() and self.distance_3d(target_pos.pos, self.uav_pos.pos) > self.pos_delta:
+                if goal_handle.is_cancel_requested:
+                    return False, "Waypoint navigation canceled"
+                feedback: GoToPos.Feedback = GoToPos.Feedback(
+                    distance_remaining=self.distance_3d(target_pos.pos, self.uav_pos.pos),
+                    current_pos=self.uav_pos
+                )
+                goal_handle.publish_feedback(feedback)
+                self.rate.sleep()
+        else:
+            return False, f"Unknown mission state for waypoint navigation: {self.mission_state}"
+
+        self.last_pos_cmd = target_pos
+        return True, f"Waypoint reached: {target_pos.pos}"
+
+    def _handle_land(self, goal_handle: ServerGoalHandle, target_pos: UavPos) -> Tuple[bool, str]:
+        """Private method to handle landing using VEHICLE_CMD_NAV_LAND."""
+        self.get_logger().info('Landing initiated')
+        
+        cmd_msg: VehicleCommand = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_NAV_LAND
+        cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+        self.vehicle_command_publisher.publish(cmd_msg)
+
+        # Monitor vehicle status until disarmed
+        while rclpy.ok() and self.armed:
+             if goal_handle.is_cancel_requested:
+                 return False, "Landing canceled"
+             self.rate.sleep()
+
+        self.uav_airborn = False
+        self.last_pos_cmd = target_pos
+        return True, "Landing complete"
+
+    def maintain_offboard_cb(self) -> None:
+        """Maintain offboard control by sending periodic signals."""
         if self.offboard_enable:
             self.send_offboard_signal()
-
+            # If armed but no action is running, hold position (loiter)
             if not self.action_in_progress and self.armed:
-                # If no action is in progress, hold current position
-                msg = TrajectorySetpoint()
+                setpoint_msg: TrajectorySetpoint = TrajectorySetpoint()
+                # Use last commanded position or current position if none exists
+                hold_pos: UavPos = self.last_pos_cmd if len(self.last_pos_cmd.pos) > 0 else self.uav_pos
+                setpoint_msg.position = hold_pos.pos
+                setpoint_msg.yaw = hold_pos.yaw
+                setpoint_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+                self.trajectory_setpoint_publisher.publish(setpoint_msg)
 
-                if len(self.last_pos_cmd.pos) == 0:
-                    self.last_pos_cmd = self.uav_pos
-                    self.last_pos_cmd.stamp = self.get_clock().now().nanoseconds / 1000
-
-                msg.position = self.last_pos_cmd.pos
-                msg.yaw = self.last_pos_cmd.yaw
-                msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                self.trajectory_setpoint_publisher.publish(msg)
-
-    def mission_state_cb(self, msg : MissionState):
+    def mission_state_cb(self, msg: MissionState) -> None:
         self.mission_state = msg.state
         self.get_logger().info(f'Mission state updated: {self.mission_state}')
 
-    # CALLBACK: Update armed status from vehicle status
-    def status_cb(self, status : VehicleStatus):
-        # arming_state == 2 means ARMED
-        self.armed = True if status.arming_state == 2 else False
-        
-    # CALLBACK: Update offboard mode status
-    def vehicle_control_mode_cb(self, mode : VehicleControlMode):
+    def status_cb(self, status: VehicleStatus) -> None:
+        self.armed = status.arming_state == VehicleStatus.ARMING_STATE_ARMED
+
+    def vehicle_control_mode_cb(self, mode: VehicleControlMode) -> None:
         self.offboard_enable = mode.flag_control_offboard_enabled
 
-    # CALLBACK: Update current position
-    def vehicle_local_position_cb(self, local_pos : VehicleLocalPosition):
-        # Store position in NED frame (North, East, Down)
+    def vehicle_local_position_cb(self, local_pos: VehicleLocalPosition) -> None:
         self.uav_pos.pos = [local_pos.x, local_pos.y, local_pos.z]
         self.uav_pos.stamp = local_pos.timestamp
 
-    def distance_2d(self, pos1, pos2):
-        # Handle list/tuple input
-        x1, y1, _ = pos1[0], pos1[1], pos1[2]
-        x2, y2, _ = pos2[0], pos2[1], pos2[2]
-        
-        dx = x2 - x1
-        dy = y2 - y1
-        
-        return math.sqrt(dx*dx + dy*dy)
+    def distance_3d(self, pos1: list, pos2: list) -> float:
+        """Calculate 3D Euclidean distance."""
+        return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2 + (pos1[2] - pos2[2])**2)
 
-    def distance_3d(self, pos1, pos2):
+    def distance_2d(self, pos1: list, pos2: list) -> float:
+        """Calculate 2D Euclidean distance."""
+        return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
 
-        x1, y1, z1 = pos1[0], pos1[1], pos1[2]
-        x2, y2, z2 = pos2[0], pos2[1], pos2[2]
-        
-        dx = x2 - x1
-        dy = y2 - y1
-        dz = z2 - z1
-        
-        return math.sqrt(dx*dx + dy*dy + dz*dz)
 
-def main(args=None):
+def main(args=None) -> None:
     print('Starting UAV Control program...')
     
     rclpy.init(args=args)
