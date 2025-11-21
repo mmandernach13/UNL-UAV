@@ -34,10 +34,18 @@ class MissionPlannerClientNode(Node):
         self.mission_planner_client = ActionClient(self, GoToPos, "control/execute_movement")
         self.get_logger().info("Mission Planner Client Node has been started.")
 
+        self.mission_state_pub = self.create_publisher(MissionState, "mission/mission_state")
+        self.get_logger().info("Mission State Publisher has been started.")
+
         self.mission_state = MissionState.MISSION_STATE_TYPE_INITIAL
         
         self.mission_dir = os.getcwd() + "/src/mission/mission_files/"
     
+    def update_mission_state(self):
+        msg = MissionState()
+        msg.state = self.mission_state
+        self.mission_state_pub.publish(msg)
+        
     def send_goal(self, target_pos: UavPos):
         self.mission_planner_client.wait_for_server()
         goal = GoToPos.Goal()
@@ -88,7 +96,8 @@ class MissionPlannerClientNode(Node):
                 point.type = self.pos_types.get(tmp_type, UavPos.UAV_POS_TYPE_WAYPOINT)
                 state = self.mission_states.get(tmp_state, MissionState.MISSION_STATE_TYPE_IDLE)
                 mission_points.append((state, point))
-        
+        return mission_points
+    
     def run_mission(self, filename: str = "ex_mission.csv"):
         mission_done = False
 
