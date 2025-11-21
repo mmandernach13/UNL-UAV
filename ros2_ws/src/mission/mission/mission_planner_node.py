@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import csv
 import os
 import rclpy
 from rclpy.node import Node
@@ -14,14 +15,19 @@ import numpy as np
 class MissionPlannerClientNode(Node):
 
     mission_states = {
-        "TAKE_OFF"    : MissionState.MISSION_STATE_CMD_TYPE_TAKEOFF,
-        "HOVER"       : MissionState.MISSION_STATE_CMD_TYPE_IDLE,
-        "WAYPOINT"    : MissionState.MISSION_STATE_CMD_TYPE_WAYPOINT,
-        "LAND"        : MissionState.MISSION_STATE_CMD_TYPE_LAND,
-        "RETURN_HOME" : MissionState.MISSION_STATE_CMD_TYPE_RTL,
-        "SEARCH"      : MissionState.MISSION_STATE_CMD_TYPE_SCAN,
+        "IDLE": MissionState.MISSION_STATE_CMD_TYPE_IDLE,
+        "MODE_CONTROL": MissionState.MISSION_STATE_CMD_TYPE_MODE_CONTROL,
+        "OFFBOARD": MissionState.MISSION_STATE_CMD_TYPE_OFFBOARD,
+        "RTL": MissionState.MISSION_STATE_CMD_TYPE_RTL,
+        "SCAN": MissionState.MISSION_STATE_CMD_TYPE_SCAN,
         "PAYLOAD_FOUND": MissionState.MISSION_STATE_CMD_TYPE_PAYLOAD_FOUND,
         "DROP_PAYLOAD": MissionState.MISSION_STATE_CMD_TYPE_DROP_PAYLOAD
+    }
+
+    pos_types = {
+        "TAKEOFF": UavPos.UAV_POS_TYPE_TAKEOFF,
+        "WAYPOINT": UavPos.UAV_POS_TYPE_WAYPOINT,
+        "LAND": UavPos.UAV_POS_TYPE_LAND,
     }
 
     def __init__(self):
@@ -50,7 +56,7 @@ class MissionPlannerClientNode(Node):
         msg = MissionState()
         msg.state = self.mission_state
         self.mission_state_pub.publish(msg)
-        
+
     def send_goal(self, target_pos: UavPos):
         self.mission_planner_client.wait_for_server()
         goal = GoToPos.Goal()
@@ -90,10 +96,22 @@ class MissionPlannerClientNode(Node):
         feedback = feedback_msg.feedback
         self.get_logger().info("Got feedback: " + str(feedback.distance_remaining))
 
-    def get_waypoints_txt(self, filename: str):
-        filename = self.mission_dir + filename
-        waypoints = np.loadtxt(filename, delimiter=',') # csv format x, y, z, yaw, type
-        return waypoints
+    def read_mission_file(self, filepath: str = "ex_mission.csv"):
+        mission_points = []
+        with open(filepath, 'r') as csvfile:
+            csvreader = csv.reader(csvfile)
+            for row in csvreader:
+                point = UavPos()
+                tmp_state = str(row[0])
+                tmp_type = str(row[5])
+                point.pos[0] = float(row[1])
+                point.pos[1] = float(row[2])
+                point.pos[2] = float(row[3])
+                point.yaw = float(row[4])
+                point.type = self.pos_types.get(tmp_type, UavPos.UAV_POS_TYPE_WAYPOINT)
+                state = self.mission_states.get(tmp_state, MissionState.MISSION_STATE_TYPE_IDLE)
+                mission_points.append((state, point))
+        return mission_points
         
     def run_mission(self, filename: str = "ex_mission.txt"):
         global pts, idx
