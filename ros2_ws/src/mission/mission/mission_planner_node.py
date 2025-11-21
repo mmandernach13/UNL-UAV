@@ -5,28 +5,52 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle, GoalStatus
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from uav_interfaces.action import GoToPos
-from uav_interfaces.msg import UavPos
+from uav_interfaces.msg import UavPos, MissionState
 import numpy as np
 
 
 class MissionPlannerClientNode(Node):
 
     mission_states = {
-        "TAKE_OFF"    : 0,
-        "HOVER"       : 1,
-        "WAYPOINT"    : 2,
-        "LAND"        : 3,
-        "RETURN_HOME" : 4,
+        "TAKE_OFF"    : MissionState.MISSION_STATE_CMD_TYPE_TAKEOFF,
+        "HOVER"       : MissionState.MISSION_STATE_CMD_TYPE_IDLE,
+        "WAYPOINT"    : MissionState.MISSION_STATE_CMD_TYPE_WAYPOINT,
+        "LAND"        : MissionState.MISSION_STATE_CMD_TYPE_LAND,
+        "RETURN_HOME" : MissionState.MISSION_STATE_CMD_TYPE_RTL,
+        "SEARCH"      : MissionState.MISSION_STATE_CMD_TYPE_SCAN,
+        "PAYLOAD_FOUND": MissionState.MISSION_STATE_CMD_TYPE_PAYLOAD_FOUND,
+        "DROP_PAYLOAD": MissionState.MISSION_STATE_CMD_TYPE_DROP_PAYLOAD
     }
 
     def __init__(self):
         super().__init__("mission_planner_client_node")
+
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
         self.mission_planner_client = ActionClient(self, GoToPos, "go_to_position")
         self.get_logger().info("Mission Planner Client Node has been started.")
+
+        self.mission_state = MissionState.MISSION_STATE_CMD_TYPE_IDLE
+        self.mission_state_pub = self.create_publisher(
+            MissionState,
+            '/mission/state',
+            qos_profile
+        )
         
         self.mission_dir = os.getcwd() + "/src/mission/mission_files/"
     
+    def publish_mission_state(self):
+        msg = MissionState()
+        msg.state = self.mission_state
+        self.mission_state_pub.publish(msg)
+        
     def send_goal(self, target_pos: UavPos):
         self.mission_planner_client.wait_for_server()
         goal = GoToPos.Goal()
