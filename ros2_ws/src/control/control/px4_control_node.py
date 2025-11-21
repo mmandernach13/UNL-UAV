@@ -188,6 +188,29 @@ class PositionController(Node):
         else:
             self.get_logger().error('Failed to arm! Check PX4 console')
 
+    def disarm_uav(self):
+        self.get_logger().info('Disarming UAV')
+        cmd_msg = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
+        cmd_msg.param1 = 0.0 # 1 to arm, 0 to disarm
+        
+        max_attempts = 100
+        attempts = 0
+        
+        while (self.armed == True) and (attempts < max_attempts):
+            self.get_logger().info(f'Attempting to disarm... (attempt {attempts})')
+
+            cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.vehicle_command_publisher.publish(cmd_msg)
+           
+            attempts += 1
+            self.rate.sleep()
+        
+        if not self.armed:
+            self.get_logger().info('UAV disarmed')
+        else:
+            self.get_logger().error('Failed to disarm! Check PX4 console')
+            
     # Every new received goal will be processed here first
     # We can decide to accept or reject the incoming goal
     def goal_pos_cb(self, goal_request: GoToPos.Goal):
