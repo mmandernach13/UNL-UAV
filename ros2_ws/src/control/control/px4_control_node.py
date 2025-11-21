@@ -11,10 +11,17 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
 from uav_interfaces.msg import UavPos, MissionState
 from uav_interfaces.action import GoToPos
+from mission.mission.mission_planner_node import MissionPlannerClientNode
 import math
 
 
 class PositionController(Node):
+
+    mission_states_str_to_int = MissionPlannerClientNode.mission_states_str_to_int
+    mission_states_int_to_str = MissionPlannerClientNode.mission_states_int_to_str
+    pos_types_str_to_int = MissionPlannerClientNode.pos_types_str_to_int
+    pos_types_int_to_str = MissionPlannerClientNode.pos_types_int_to_str
+
     def __init__(self): 
         super().__init__('position_control')
         
@@ -301,6 +308,7 @@ class PositionController(Node):
     # CALLBACK: Update mission state
     def mission_state_cb(self, state_msg):
         self.mission_state = state_msg.state
+        self.get_logger().info(f"Mission state updated to: {self.mission_states_int_to_str.get(self.mission_state)}")
 
     # CALLBACK: Update armed status from vehicle status
     def status_cb(self, status):
@@ -318,7 +326,6 @@ class PositionController(Node):
         self.uav_pos.stamp = local_pos.timestamp
 
     def distance_2d(self, pos1, pos2):
-        # Handle list/tuple input
         x1, y1, _ = pos1[0], pos1[1], pos1[2]
         x2, y2, _ = pos2[0], pos2[1], pos2[2]
         
@@ -328,17 +335,6 @@ class PositionController(Node):
         return math.sqrt(dx*dx + dy*dy)
 
     def distance_3d(self, pos1, pos2):
-        """
-        Calculate 3D Euclidean distance between two positions.
-        
-        Args:
-            pos1: List/tuple of [x, y, z] or object with .x, .y, .z attributes
-            pos2: List/tuple of [x, y, z] or object with .x, .y, .z attributes
-        
-        Returns:
-            float: Distance in meters
-        """
-        # Handle list/tuple input
         x1, y1, z1 = pos1[0], pos1[1], pos1[2]
         x2, y2, z2 = pos2[0], pos2[1], pos2[2]
         

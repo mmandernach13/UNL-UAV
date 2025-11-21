@@ -14,21 +14,25 @@ import numpy as np
 
 class MissionPlannerClientNode(Node):
 
-    mission_states = {
-        "IDLE": MissionState.MISSION_STATE_CMD_TYPE_IDLE,
-        "MODE_CONTROL": MissionState.MISSION_STATE_CMD_TYPE_MODE_CONTROL,
-        "OFFBOARD": MissionState.MISSION_STATE_CMD_TYPE_OFFBOARD,
-        "RTL": MissionState.MISSION_STATE_CMD_TYPE_RTL,
-        "SCAN": MissionState.MISSION_STATE_CMD_TYPE_SCAN,
-        "PAYLOAD_FOUND": MissionState.MISSION_STATE_CMD_TYPE_PAYLOAD_FOUND,
-        "DROP_PAYLOAD": MissionState.MISSION_STATE_CMD_TYPE_DROP_PAYLOAD
+    mission_states_str_to_int = {
+        "IDLE": MissionState.MISSION_STATE_TYPE_IDLE,
+        "MODE_CONTROL": MissionState.MISSION_STATE_TYPE_MODE_CONTROL,
+        "OFFBOARD": MissionState.MISSION_STATE_TYPE_OFFBOARD,
+        "RTL": MissionState.MISSION_STATE_TYPE_RTL,
+        "SCAN": MissionState.MISSION_STATE_TYPE_SCAN,
+        "PAYLOAD_FOUND": MissionState.MISSION_STATE_TYPE_PAYLOAD_FOUND,
+        "DROP_PAYLOAD": MissionState.MISSION_STATE_TYPE_DROP_PAYLOAD
     }
 
-    pos_types = {
+    mission_states_int_to_str = {v: k for k, v in mission_states_str_to_int.items()}
+
+    pos_types_str_to_int = {
         "TAKEOFF": UavPos.UAV_POS_TYPE_TAKEOFF,
         "WAYPOINT": UavPos.UAV_POS_TYPE_WAYPOINT,
         "LAND": UavPos.UAV_POS_TYPE_LAND,
     }
+
+    pos_types_int_to_str = {v: k for k, v in pos_types_str_to_int.items()}
 
     def __init__(self):
         super().__init__("mission_planner_client_node")
@@ -43,7 +47,7 @@ class MissionPlannerClientNode(Node):
         self.mission_planner_client = ActionClient(self, GoToPos, "go_to_position")
         self.get_logger().info("Mission Planner Client Node has been started.")
 
-        self.mission_state = MissionState.MISSION_STATE_CMD_TYPE_IDLE
+        self.mission_state = MissionState.MISSION_STATE_TYPE_IDLE
         self.mission_state_pub = self.create_publisher(
             MissionState,
             '/mission/state',
@@ -56,6 +60,7 @@ class MissionPlannerClientNode(Node):
         msg = MissionState()
         msg.state = self.mission_state
         self.mission_state_pub.publish(msg)
+        self.get_logger().info(f"Published mission state: {self.mission_states_int_to_str.get(self.mission_state)}")
 
     def send_goal(self, target_pos: UavPos):
         self.mission_planner_client.wait_for_server()
@@ -82,10 +87,8 @@ class MissionPlannerClientNode(Node):
         result = future.result().result
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info("Success")
-            global pts, idx
+            global idx
             idx += 1
-            if idx < len(pts):
-                self.send_goal(pts[idx])
         elif status == GoalStatus.STATUS_ABORTED:
             self.get_logger().error("Aborted")
         elif status == GoalStatus.STATUS_CANCELED:
@@ -108,25 +111,27 @@ class MissionPlannerClientNode(Node):
                 point.pos[1] = float(row[2])
                 point.pos[2] = float(row[3])
                 point.yaw = float(row[4])
-                point.type = self.pos_types.get(tmp_type, UavPos.UAV_POS_TYPE_WAYPOINT)
-                state = self.mission_states.get(tmp_state, MissionState.MISSION_STATE_TYPE_IDLE)
+                point.type = self.pos_types_str_to_int.get(tmp_type, UavPos.UAV_POS_TYPE_WAYPOINT)
+                state = self.mission_states_str_to_int.get(tmp_state, MissionState.MISSION_STATE_TYPE_IDLE)
                 mission_points.append((state, point))
         return mission_points
         
-    def run_mission(self, filename: str = "ex_mission.txt"):
-        global pts, idx
-        waypoints = self.get_waypoints_txt(filename)
-        pts = []
-        for wp in waypoints:
-            pos = UavPos()
-            pos.pos[0] = float(wp[0])
-            pos.pos[1] = float(wp[1])
-            pos.pos[2] = float(wp[2])
-            pos.yaw = float(wp[3])
-            pos.type = int(wp[4])
-            pts.append(pos)
+    def run_mission(self, filename: str = "ex_mission.csv"):
+        global idx
         idx = 0
-        self.send_goal(pts[idx])
+        mission_filepath = os.path.join(self.mission_dir, filename)
+        mission_points = self.read_mission_file(mission_filepath)
+        total_points = len(mission_points)
+
+        while rclpy.ok() and idx < total_points:
+            state, point = mission_points[idx]
+            self.mission_state = state
+            self.publish_mission_state()
+            self.get_logger().info(f"Sending goal {idx + 1}/{total_points}: State={self.mission_states_int_to_str.get(state)}, \
+                                   Pos=({point.pos[0]}, {point.pos[1]}, {point.pos[2]}), Yaw={point.yaw}, Type={self.pos_types_str_to_int.get(type)}")
+            self.send_goal(point)
+            rclpy.spin_once(self)
+            idx += 1
 
 
 def main(args=None):
