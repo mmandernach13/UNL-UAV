@@ -9,7 +9,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
-from uav_interfaces.msg import UavPos 
+from uav_interfaces.msg import UavPos, MissionState
 from uav_interfaces.action import GoToPos
 import math
 
@@ -33,6 +33,7 @@ class PositionController(Node):
         self.uav_pos = UavPos()  # Current [x, y, z], yaw position of UAV
         self.take_off = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
+        self.mission_state = None  # Current mission state
         self.armed = False  # Flag: Are motors armed?
         self.action_in_progress = False  # Flag: Is an action currently being executed?
         global offboard_signal_msg
@@ -89,6 +90,14 @@ class PositionController(Node):
             qos_profile
         )
         self.get_logger().info('Status sub created')
+
+        self.mission_state_sub = self.create_subscription(
+            MissionState,
+            '/mission/state',
+            self.mission_state_cb,
+            qos_profile
+        )
+        self.get_logger().info('Mission state sub created')
 
         # PUBLISHERS - Send commands and setpoints to PX4
         # Send high-level commands (arm, disarm, mode changes, land, etc.)
@@ -288,6 +297,10 @@ class PositionController(Node):
                 msg.yaw = 0.0
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
+
+    # CALLBACK: Update mission state
+    def mission_state_cb(self, state_msg):
+        self.mission_state = state_msg.state
 
     # CALLBACK: Update armed status from vehicle status
     def status_cb(self, status):
