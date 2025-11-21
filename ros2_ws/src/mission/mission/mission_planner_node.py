@@ -5,6 +5,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle, GoalStatus
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from uav_interfaces.action import GoToPos
 from uav_interfaces.msg import UavPos, MissionState
 import csv
@@ -31,13 +32,21 @@ class MissionPlannerClientNode(Node):
 
     def __init__(self):
         super().__init__("mission_planner_client_node")
+
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
         self.mission_planner_client = ActionClient(self, GoToPos, "control/execute_movement")
         self.get_logger().info("Mission Planner Client Node has been started.")
 
-        self.mission_state_pub = self.create_publisher(MissionState, "mission/mission_state")
+        self.mission_state_pub = self.create_publisher(MissionState, "mission/mission_state", qos_profile)
         self.get_logger().info("Mission State Publisher has been started.")
 
-        self.mission_state = MissionState.MISSION_STATE_TYPE_INITIAL
+        self.mission_state = MissionState.MISSION_STATE_TYPE_IDLE
         
         self.mission_dir = os.getcwd() + "/src/mission/mission_files/"
     
@@ -71,6 +80,8 @@ class MissionPlannerClientNode(Node):
         result = future.result().result
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info("Success")
+            global idx 
+            idx += 1
         elif status == GoalStatus.STATUS_ABORTED:
             self.get_logger().error("Aborted")
         elif status == GoalStatus.STATUS_CANCELED:
@@ -102,23 +113,31 @@ class MissionPlannerClientNode(Node):
         mission_done = False
         self.update_mission_state() 
 
-        while not mission_done:
-            
-            if self.mission_state == MissionState.MISSION_STATE_TYPE_INITIAL:
-                self.get_logger().info("Mission State: INITIAL")
-                mission_file_path = self.mission_dir + filename
+        mission_file_path = self.mission_dir + filename
+        mission_cmds = self.read_mission_file(mission_file_path)
 
-            elif self.mission_state == MissionState.MISSION_STATE_TYPE_IDLE:
+        global idx 
+        idx = 0
+
+        while not mission_done:
+            self.mission_state = mission_cmds[idx][0]
+            self.update_mission_state()
+            
+            if self.mission_state == MissionState.MISSION_STATE_TYPE_IDLE:
                 self.get_logger().info("Mission State: IDLE")
 
             elif self.mission_state == MissionState.MISSION_STATE_TYPE_MODE_CONTROL:
                 self.get_logger().info("Mission State: MODE_CONTROL")
+                self.send_goal(mission_cmds[idx][1])
 
             elif self.mission_state == MissionState.MISSION_STATE_TYPE_OFFBOARD:
                 self.get_logger().info("Mission State: OFFBOARD")
 
             elif self.mission_state == MissionState.MISSION_STATE_TYPE_SCAN:
                 self.get_logger().info("Mission State: SCAN")
+
+            if idx == len(mission_cmds):
+                mission_done = True
 
 
 def main(args=None):
