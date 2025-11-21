@@ -210,7 +210,7 @@ class PositionController(Node):
             self.get_logger().info('UAV disarmed')
         else:
             self.get_logger().error('Failed to disarm! Check PX4 console')
-            
+
     # Every new received goal will be processed here first
     # We can decide to accept or reject the incoming goal
     def goal_pos_cb(self, goal_request: GoToPos.Goal):
@@ -245,21 +245,22 @@ class PositionController(Node):
         self.action_in_progress = True
         self.take_off = False
 
+        target_pos: UavPos = goal.request.target_pos
+        result = GoToPos.Result()
+        feedback = GoToPos.Feedback()
+
         self.get_logger().info("Wait for uav initial position...")
         while (len(self.uav_pos.pos) == 0):
              time.sleep(0.1)
         self.get_logger().info("position received")
 
         try:
-            if (self.offboard_enable == False):
-                self.enter_offboard_mode()
+            if self.mission_state == MissionState.MISSION_STATE_TYPE_OFFBOARD:
+                if (self.offboard_enable == False):
+                    self.enter_offboard_mode()
 
             if (self.armed == False):
                 self.arm_uav()
-
-            target_pos: UavPos = goal.request.target_pos
-            result = GoToPos.Result()
-            feedback = GoToPos.Feedback()
 
             self.get_logger().info('Executing Goal')
             dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
@@ -314,7 +315,24 @@ class PositionController(Node):
         
         finally:
             self.action_in_progress = False
-   
+    
+    def _handle_takeoff(self, goal_handle: ServerGoalHandle):
+        target_pos: UavPos = goal_handle.request.target_pos
+        target_altitude = target_pos.pos[2]
+        self.get_logger().info(f'Initiating takeoff to altitude {-target_altitude} m')
+        # Implement takeoff logic
+        pass
+    
+    def _handle_waypoint(self, target_pos: UavPos):
+        self.get_logger().info(f'Navigating to waypoint at position {target_pos.pos} with yaw {target_pos.yaw}')
+        # Implement waypoint navigation logic
+        pass
+
+    def _handle_landing(self):
+        self.get_logger().info('Initiating landing sequence')
+        # Implement landing logic
+        pass
+
     # CALLBACK: maintains offboard control (have to publish at >2Hz)
     def maintain_offboard_cb(self):
         if self.offboard_enable:
