@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'px4_control_node = control.px4_control_node:main'
+            'px4_control = control.px4_control_node:main'
         ],
     },
 )
