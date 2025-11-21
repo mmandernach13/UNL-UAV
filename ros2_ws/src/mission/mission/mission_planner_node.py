@@ -15,7 +15,6 @@ import numpy as np
 class MissionPlannerClientNode(Node): 
 
     mission_states = {
-        "INITIAL": MissionState.MISSION_STATE_TYPE_INITIAL,
         "IDLE": MissionState.MISSION_STATE_TYPE_IDLE,
         "MODE_CONTROL": MissionState.MISSION_STATE_TYPE_MODE_CONTROL,
         "OFFBOARD": MissionState.MISSION_STATE_TYPE_OFFBOARD,
@@ -118,26 +117,33 @@ class MissionPlannerClientNode(Node):
 
         global idx 
         idx = 0
+        itr = 0
+        self.mission_state = mission_cmds[idx][0]
 
         while not mission_done:
-            self.mission_state = mission_cmds[idx][0]
-            self.update_mission_state()
+
+            if self.mission_state != mission_cmds[idx][0] or itr == 0:
+
+                self.mission_state = mission_cmds[idx][0]
+                self.update_mission_state()
+                
+                if self.mission_state == MissionState.MISSION_STATE_TYPE_IDLE:
+                    self.get_logger().info("Mission State: IDLE")
+
+                elif self.mission_state == MissionState.MISSION_STATE_TYPE_MODE_CONTROL:
+                    self.get_logger().info("Mission State: MODE_CONTROL")
+                    self.send_goal(mission_cmds[idx][1])
+
+                elif self.mission_state == MissionState.MISSION_STATE_TYPE_OFFBOARD:
+                    self.get_logger().info("Mission State: OFFBOARD")
+
+                elif self.mission_state == MissionState.MISSION_STATE_TYPE_SCAN:
+                    self.get_logger().info("Mission State: SCAN")
+
+                if idx == len(mission_cmds):
+                    mission_done = True
             
-            if self.mission_state == MissionState.MISSION_STATE_TYPE_IDLE:
-                self.get_logger().info("Mission State: IDLE")
-
-            elif self.mission_state == MissionState.MISSION_STATE_TYPE_MODE_CONTROL:
-                self.get_logger().info("Mission State: MODE_CONTROL")
-                self.send_goal(mission_cmds[idx][1])
-
-            elif self.mission_state == MissionState.MISSION_STATE_TYPE_OFFBOARD:
-                self.get_logger().info("Mission State: OFFBOARD")
-
-            elif self.mission_state == MissionState.MISSION_STATE_TYPE_SCAN:
-                self.get_logger().info("Mission State: SCAN")
-
-            if idx == len(mission_cmds):
-                mission_done = True
+            itr += 1
 
 
 def main(args=None):
@@ -148,7 +154,6 @@ def main(args=None):
     
     rclpy.spin(node)
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()

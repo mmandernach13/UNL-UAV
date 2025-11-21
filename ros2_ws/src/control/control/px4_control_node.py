@@ -124,18 +124,22 @@ class PositionController(Node):
             self.rate.sleep()
         self.get_logger().info('OFFBOARD mode enabled')
 
-    def arm_uav(self) -> None:
-        self.get_logger().info('Arming UAV...')
-        cmd_msg: VehicleCommand = VehicleCommand()
+    def arm_uav(self):
+        self.get_logger().info('Arming UAV')
+        cmd_msg = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
-        cmd_msg.param1 = 1.0  # 1 to arm
-        cmd_msg.target_system = 1
-        cmd_msg.target_component = 1
+        cmd_msg.param1 = 1.0 # 1 to arm, 0 to disarm
         
-        while not self.armed:
-            cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+        max_attempts = 100
+        attempts = 0
+        
+        while (self.armed == False) and (attempts < max_attempts):
+            self.get_logger().info(f'Attempting to arm... (attempt {attempts})')
+
+            cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
             self.vehicle_command_publisher.publish(cmd_msg)
-            self.get_logger().info('Attempting to arm...')
+           
+            attempts += 1
             self.rate.sleep()
         
         if self.armed:
@@ -182,6 +186,7 @@ class PositionController(Node):
             return GoalResponse.REJECT
         if not self.uav_airborn and new_pos.type == UavPos.UAV_POS_TYPE_WAYPOINT:
             self.get_logger().warn('REJECT: Cannot go to waypoint when not airborne')
+            self.get_logger().warn(f'requested pos: {new_pos}')
             return GoalResponse.REJECT
 
         self.get_logger().info(f'ACCEPT: Goal for UavPos: {new_pos.pos}')
@@ -206,6 +211,7 @@ class PositionController(Node):
             if self.mission_state == MissionState.MISSION_STATE_TYPE_OFFBOARD:
                 if not self.offboard_enable:
                     self.enter_offboard_mode()
+
                 if not self.armed:
                     self.arm_uav()
             
@@ -260,12 +266,18 @@ class PositionController(Node):
         
         cmd_msg: VehicleCommand = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
-        cmd_msg.param7 = -target_pos.pos[2]  # Target altitude (positive value)
+        cmd_msg.param7 = float(-target_pos.pos[2])  # Target altitude (positive value)
+        cmd_msg.target_system = 1
+        cmd_msg.target_component = 1
+        cmd_msg.source_system = 1
+        cmd_msg.source_component = 1
+        cmd_msg.from_external = True
         cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
         self.vehicle_command_publisher.publish(cmd_msg)
 
         # Monitor altitude
         while rclpy.ok() and math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) > self.pos_delta:
+            self.get_logger().info(f'Climbing: {-self.uav_pos.pos[2]}')
             if goal_handle.is_cancel_requested:
                 return False, "Takeoff canceled"
             feedback: GoToPos.Feedback = GoToPos.Feedback(
@@ -312,10 +324,10 @@ class PositionController(Node):
             cmd_msg.param1 = 0.0  # Hold time in seconds
             cmd_msg.param2 = 0.0  # Acceptance radius in meters
             cmd_msg.param3 = 0.0  # Pass-through
-            cmd_msg.param4 = target_pos.yaw
-            cmd_msg.param5 = target_pos.pos[0] # Latitude / X
-            cmd_msg.param6 = target_pos.pos[1] # Longitude / Y
-            cmd_msg.param7 = -target_pos.pos[2] # Altitude (positive)
+            cmd_msg.param4 = float(target_pos.yaw)
+            cmd_msg.param5 = float(target_pos.pos[0]) # Latitude / X
+            cmd_msg.param6 = float(target_pos.pos[1]) # Longitude / Y
+            cmd_msg.param7 = float(-target_pos.pos[2]) # Altitude (positive)
             cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
             self.vehicle_command_publisher.publish(cmd_msg)
 
@@ -373,7 +385,8 @@ class PositionController(Node):
         self.get_logger().info(f'Mission state updated: {self.mission_state}')
 
     def status_cb(self, status: VehicleStatus) -> None:
-        self.armed = status.arming_state == VehicleStatus.ARMING_STATE_ARMED
+        # arming_state == 2 means ARMED
+        self.armed = True if status.arming_state == 2 else False
 
     def vehicle_control_mode_cb(self, mode: VehicleControlMode) -> None:
         self.offboard_enable = mode.flag_control_offboard_enabled
