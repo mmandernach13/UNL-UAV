@@ -203,7 +203,7 @@ class PositionController(Node):
             result: GoToPos.Result = GoToPos.Result()
 
             # --- Pre-flight checks and setup ---
-            if self.mission_state == MissionState.OFFBOARD:
+            if self.mission_state == MissionState.MISSION_STATE_TYPE_OFFBOARD:
                 if not self.offboard_enable:
                     self.enter_offboard_mode()
                 if not self.armed:
@@ -284,7 +284,7 @@ class PositionController(Node):
         self.get_logger().info(f'Navigating to waypoint: {target_pos.pos}')
         
         # --- Conditional Waypoint Logic ---
-        if self.mission_state == MissionState.OFFBOARD:
+        if self.mission_state == MissionState.MISSION_STATE_TYPE_OFFBOARD:
             # Use Trajectory Setpoints for precise offboard control
             self.get_logger().info("Using Trajectory Setpoints for waypoint navigation.")
             while rclpy.ok() and self.distance_3d(target_pos.pos, self.uav_pos.pos) > self.pos_delta:
@@ -304,7 +304,7 @@ class PositionController(Node):
                 goal_handle.publish_feedback(feedback)
                 self.rate.sleep()
 
-        elif self.mission_state == MissionState.MODE_CONTROL:
+        elif self.mission_state == MissionState.MISSION_STATE_TYPE_MODE_CONTROL:
             # Use Vehicle Commands to let PX4 handle waypoint navigation
             self.get_logger().info("Using Vehicle Command for waypoint navigation.")
             cmd_msg: VehicleCommand = VehicleCommand()

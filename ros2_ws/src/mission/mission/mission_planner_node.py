@@ -45,7 +45,7 @@ class MissionPlannerClientNode(Node):
         msg = MissionState()
         msg.state = self.mission_state
         self.mission_state_pub.publish(msg)
-        
+
     def send_goal(self, target_pos: UavPos):
         self.mission_planner_client.wait_for_server()
         goal = GoToPos.Goal()
@@ -100,6 +100,7 @@ class MissionPlannerClientNode(Node):
     
     def run_mission(self, filename: str = "ex_mission.csv"):
         mission_done = False
+        self.update_mission_state() 
 
         while not mission_done:
             
