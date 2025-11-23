@@ -289,7 +289,7 @@ class PositionController(Node):
                 elif target_pos.type == UavPos.UAV_POS_TYPE_WAYPOINT:   
                     result = self._handle_waypoint(target_pos)
                 elif target_pos.type == UavPos.UAV_POS_TYPE_LAND:
-                    result = self._handle_landing()
+                    result = self._handle_landing(goal)
 
                 if result.success:
                     self.get_logger().info('Goal succeeded')
@@ -358,10 +358,42 @@ class PositionController(Node):
         # Implement waypoint navigation logic
         pass
 
-    def _handle_landing(self) -> GoToPos.Result:
+    def _handle_landing(self, goal: ServerGoalHandle) -> GoToPos.Result:
         self.get_logger().info('Initiating landing sequence')
-        # Implement landing logic
-        pass
+        result = GoToPos.Result()
+        feedback = GoToPos.Feedback()
+
+        msg = VehicleCommand()
+        msg.command = VehicleCommand.VEHICLE_CMD_NAV_LAND
+        while rclpy.ok() and (self.last_command_ack is None or
+              self.last_command_ack.command != VehicleCommand.VEHICLE_CMD_NAV_LAND or
+              self.last_command_ack.result != VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED):
+            self.get_logger().info('Sending land command')
+
+            msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.vehicle_command_publisher.publish(msg)
+            self.rate.sleep()
+        
+        self.get_logger().info('Land command accepted')
+
+        # Wait until UAV lands (altitude near zero)
+        while rclpy.ok():
+            result = self._handle_cancellation(goal)
+
+            current_altitude = self.uav_pos.pos[2]
+            self.get_logger().info(f'Current altitude: {-current_altitude} m')
+
+            feedback.current_pos = self.uav_pos
+            feedback.distance_remaining = abs(current_altitude)
+            goal.publish_feedback(feedback)
+
+            if abs(current_altitude) <= self.pos_delta:
+                self.get_logger().info('Landing complete')
+                result.success = True
+                result.message = 'Landing successful'
+                return result
+
+            self.rate.sleep()
 
     # CALLBACK: maintains offboard control (have to publish at >2Hz)
     def maintain_offboard_cb(self):
