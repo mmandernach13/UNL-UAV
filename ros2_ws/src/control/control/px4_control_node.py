@@ -8,7 +8,8 @@ from rclpy.action.server import ServerGoalHandle
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus, VehicleControlMode
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, \
+                        VehicleCommandAck, VehicleLocalPosition, VehicleStatus, VehicleControlMode
 from uav_interfaces.msg import UavPos, MissionState
 from uav_interfaces.action import GoToPos
 from mission.mission.mission_planner_node import MissionPlannerClientNode
@@ -41,6 +42,7 @@ class PositionController(Node):
         self.take_off = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
         self.mission_state = None  # Current mission state
+        self.last_command_ack = None  # Last command acknowledgement from PX4
         self.armed = False  # Flag: Are motors armed?
         self.action_in_progress = False  # Flag: Is an action currently being executed?
         global offboard_signal_msg
@@ -98,6 +100,7 @@ class PositionController(Node):
         )
         self.get_logger().info('Status sub created')
 
+        # Mission state updates
         self.mission_state_sub = self.create_subscription(
             MissionState,
             '/mission/state',
@@ -105,6 +108,15 @@ class PositionController(Node):
             qos_profile
         )
         self.get_logger().info('Mission state sub created')
+
+        # Acknowledgements from PX4 after sending commands
+        self.command_ack_sub = self.create_subscription(
+            VehicleCommandAck,
+            '/fmu/out/vehicle_command_ack',
+            self.command_ack_cb,
+            qos_profile
+        )
+        self.get_logger().info('Command ack sub created')
 
         # PUBLISHERS - Send commands and setpoints to PX4
         # Send high-level commands (arm, disarm, mode changes, land, etc.)
@@ -241,7 +253,7 @@ class PositionController(Node):
     # If a goal has been accepted, it will then be executed in this callback
     # After we are done with the goal execution we set a final state and return the result
     # When executing the goal we also check if we need to cancel it
-    def excecute_pos_cb(self, goal: ServerGoalHandle):
+    def excecute_pos_cb(self, goal: ServerGoalHandle) -> GoToPos.Result:
         self.action_in_progress = True
         self.take_off = False
 
@@ -259,76 +271,94 @@ class PositionController(Node):
                 if (self.offboard_enable == False):
                     self.enter_offboard_mode()
 
+            if self.mission_state == MissionState.MISSION_STATE_TYPE_MODE_CONTROL:
+                if (self.offboard_enable == True):
+                    self.get_logger().info("Disabling OFFBOARD mode")
+                    offboard_signal_msg.position = False
+                    self.send_offboard_signal()
+                    self.offboard_enable = False
+
             if (self.armed == False):
                 self.arm_uav()
 
-            self.get_logger().info('Executing Goal')
-            dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
+            self.get_logger().info(f'Executing Goal of type: {self.pos_types_int_to_str.get(target_pos.type)}')
             
-            while dist > self.pos_delta:
-                if goal.is_cancel_requested:
-                    self.get_logger().info('Cancelling goal')
-                    goal.canceled()
-                    result.success = False 
-                    result.message = f'reached position {self.uav_pos}'
-                    return result
-                
-                msg = TrajectorySetpoint()
-                        
-                # Check if we've reached takeoff altitude
-                if(math.fabs(self.uav_pos.pos[2] - target_pos.pos[2]) < self.pos_delta) and (self.take_off == False):
-                    self.get_logger().info('Takeoff altitude reached')
-                    self.take_off = True
-                
-                # If at takeoff altitude, start waypoint navigation
-                if (self.take_off == True):
-                        msg.position = target_pos.pos
-                        msg.yaw = target_pos.yaw
-                        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                        self.trajectory_setpoint_publisher.publish(msg)
-                        
-                        # Check if we're close enough to current waypoint
-                        distance = self.distance_2d(target_pos.pos, self.uav_pos.pos) 
-                else:
-                    # Still taking off - hold horizontal position, climb to altitude
-                    self.get_logger().info(f'Taking off: climbing to {target_pos.pos[2]} m, hold pos x:{self.uav_pos.pos[0]}, y:{self.uav_pos.pos[1]}')
-                    msg.position = [float(self.uav_pos.pos[0]), 
-                                    float(self.uav_pos.pos[1]), 
-                                    float(target_pos.pos[2])]
-                    msg.yaw = 0.0  
-                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                    self.trajectory_setpoint_publisher.publish(msg)
-                
-                dist = self.distance_3d(target_pos.pos, self.uav_pos.pos)
-                cp = UavPos()
-                cp = self.uav_pos
-                feedback.distance_remaining = dist
-                feedback.current_pos = cp
-                goal.publish_feedback(feedback)
+            while rclpy.ok():
+                if target_pos.type == UavPos.UAV_POS_TYPE_TAKEOFF:
+                    result = self._handle_takeoff(goal)
+                elif target_pos.type == UavPos.UAV_POS_TYPE_WAYPOINT:   
+                    result = self._handle_waypoint(target_pos)
+                elif target_pos.type == UavPos.UAV_POS_TYPE_LAND:
+                    result = self._handle_landing()
 
-                self.rate.sleep()
-            
-            goal.succeed()
-            result.success = True
-            result.message = f'reached position {self.uav_pos}'
-            return result
-        
+                if result.success:
+                    self.get_logger().info('Goal succeeded')
+                    goal.succeed()
+                    return result
         finally:
             self.action_in_progress = False
-    
-    def _handle_takeoff(self, goal_handle: ServerGoalHandle):
-        target_pos: UavPos = goal_handle.request.target_pos
+
+    def _handle_cancellation(self, goal: ServerGoalHandle) -> GoToPos.Result:
+        result = GoToPos.Result()
+
+        if goal.is_cancel_requested:
+            goal.canceled()
+            self.get_logger().info('Goal canceled')
+            result.success = False
+            result.message = 'Takeoff canceled'
+
+        return result
+        
+    def _handle_takeoff(self, goal: ServerGoalHandle) -> GoToPos.Result:
+        target_pos: UavPos = goal.request.target_pos
         target_altitude = target_pos.pos[2]
+
+        result = GoToPos.Result()
+        feedback = GoToPos.Feedback()
+
         self.get_logger().info(f'Initiating takeoff to altitude {-target_altitude} m')
-        # Implement takeoff logic
-        pass
+        
+        msg = VehicleCommand()
+        msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
+        msg.param7 = -target_altitude  # Takeoff altitude (NED frame, negative down)
+
+        while rclpy.ok() and (self.last_command_ack is None or
+              self.last_command_ack.command != VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF or
+              self.last_command_ack.result != VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED):
+            self.get_logger().info('Sending takeoff command')
+
+            msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.vehicle_command_publisher.publish(msg)
+            self.rate.sleep()
+
+        self.get_logger().info('Takeoff command accepted')
+
+        # Wait until UAV reaches target altitude
+        while rclpy.ok():
+            result = self._handle_cancellation(goal)
+
+            current_altitude = self.uav_pos.pos[2]
+            altitude_error = abs(current_altitude - target_altitude)
+            self.get_logger().info(f'Current altitude: {-current_altitude} m, Target altitude: {-target_altitude} m, Error: {altitude_error} m')
+
+            feedback.current_pos = self.uav_pos
+            feedback.distance_remaining = altitude_error
+            goal.publish_feedback(feedback)
+
+            if altitude_error <= self.pos_delta:
+                self.get_logger().info('Takeoff complete')
+                result.success = True
+                result.message = 'Takeoff successful'
+                return result
+
+            self.rate.sleep()
     
-    def _handle_waypoint(self, target_pos: UavPos):
+    def _handle_waypoint(self, target_pos: UavPos) -> GoToPos.Result:
         self.get_logger().info(f'Navigating to waypoint at position {target_pos.pos} with yaw {target_pos.yaw}')
         # Implement waypoint navigation logic
         pass
 
-    def _handle_landing(self):
+    def _handle_landing(self) -> GoToPos.Result:
         self.get_logger().info('Initiating landing sequence')
         # Implement landing logic
         pass
@@ -346,6 +376,21 @@ class PositionController(Node):
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
 
+    # CALLBACK: Process command acknowledgements from PX4
+    def command_ack_cb(self, ack_msg):
+        if ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED:
+            self.get_logger().info(f'Command {ack_msg.command} acknowledged: ACCEPTED')
+            self.last_command_ack = ack_msg
+        elif ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED:
+            self.get_logger().warn(f'Command {ack_msg.command} acknowledged: TEMPORARILY REJECTED')
+        elif ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_DENIED:
+            self.get_logger().error(f'Command {ack_msg.command} acknowledged: DENIED')
+        elif ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_UNSUPPORTED:
+            self.get_logger().error(f'Command {ack_msg.command} acknowledged: UNSUPPORTED')
+        elif ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_FAILED:
+            self.get_logger().error(f'Command {ack_msg.command} acknowledged: FAILED')
+
+    
     # CALLBACK: Update mission state
     def mission_state_cb(self, state_msg):
         self.mission_state = state_msg.state
