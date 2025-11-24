@@ -312,7 +312,7 @@ class PositionController(Node):
             
             while rclpy.ok():
                 result = self._handle_cancellation(goal)
-                
+
                 if result.success == False:
                     return result
                 
@@ -337,7 +337,7 @@ class PositionController(Node):
             goal.canceled()
             self.get_logger().info('Goal canceled')
             result.success = False
-            result.message = 'Takeoff canceled'
+            result.message = 'Goal canceled'
 
         return result
         
