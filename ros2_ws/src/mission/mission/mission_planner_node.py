@@ -57,12 +57,14 @@ class MissionPlannerClientNode(Node):
         
         self.mission_dir = os.getcwd() + "/src/mission/mission_files/"
     
+    # publish the current mission state
     def publish_mission_state(self) -> None:
         msg = MissionState()
         msg.state = self.mission_state
         self.mission_state_pub.publish(msg)
         self.get_logger().info(f"Published mission state: {self.mission_states_int_to_str.get(self.mission_state)}")
 
+    # send a position goal async
     def send_goal(self, target_pos: UavPos) -> None:
         self.mission_planner_client.wait_for_server()
         goal = GoToPos.Goal()
@@ -71,10 +73,12 @@ class MissionPlannerClientNode(Node):
             goal, feedback_callback=self.goal_feedback_callback). \
             add_done_callback(self.goal_response_callback)
 
+    # cancel a goal async
     def cancel_goal(self) -> None:
         self.get_logger().info("Send a cancel goal request")
         self.goal_handle_.cancel_goal_async()
 
+    # get the response if the goal is accepted 
     def goal_response_callback(self, future) -> None:
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:
@@ -83,6 +87,8 @@ class MissionPlannerClientNode(Node):
         else:
             self.get_logger().info("Goal got rejected")
 
+    # get the result once the goal is finished
+    # handles success, abort, and cancels
     def goal_result_callback(self, future) -> None:
         status = future.result().status
         result = future.result().result
@@ -96,10 +102,15 @@ class MissionPlannerClientNode(Node):
             self.get_logger().warn("Canceled")
         self.get_logger().info("Result: " + str(result.message))
 
+    # get the feedback from the action
     def goal_feedback_callback(self, feedback_msg) -> None:
         feedback = feedback_msg.feedback
         self.get_logger().info("Got feedback: " + str(feedback.distance_remaining))
 
+    # parse the mission file (.csv)
+    # csv in format [state, x, y, z, yaw, type]
+    # state in MISSION_STATE_TYPE_x: x, y, z in NED frame (z is down) 
+    # yaw in (0, 360) deg: type in UAV_POS_TYPE_x
     def read_mission_file(self, filepath: str = "ex_mission.csv") -> list[tuple[int, UavPos]]:
         mission_points = []
         with open(filepath, 'r') as csvfile:
@@ -116,7 +127,8 @@ class MissionPlannerClientNode(Node):
                 state = self.mission_states_str_to_int.get(tmp_state, MissionState.MISSION_STATE_TYPE_IDLE)
                 mission_points.append((state, point))
         return mission_points
-        
+    
+    # load and run the mission from the given file
     def run_mission(self, filename: str = "ex_mission.csv") -> None:
         global idx
         idx = 0
