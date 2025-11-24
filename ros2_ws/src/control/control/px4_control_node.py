@@ -39,14 +39,16 @@ class PositionController(Node):
 
         # State variables to track UAV status
         self.uav_pos = UavPos()  # Current [x, y, z], yaw position of UAV
-        self.take_off = False   # Flag: Has UAV reached takeoff altitude?
-        self.offboard_enable = False  # Flag: Is offboard mode active?
-        self.auto_enable = False  # Flag: Is auto mode active?
+        self.offboard_signal_msg = OffboardControlMode()
         self.mission_state = None  # Current mission state
         self.last_command_ack = None  # Last command acknowledgement from PX4
+
+        # Flags to track UAV condition
+        self.uav_airborn = False   # Flag: Has UAV reached takeoff altitude?
+        self.offboard_enable = False  # Flag: Is offboard mode active?
+        self.auto_enable = False  # Flag: Is auto mode active?
         self.armed = False  # Flag: Are motors armed?
         self.action_in_progress = False  # Flag: Is an action currently being executed?
-        self.offboard_signal_msg = OffboardControlMode()
 
         # Parameters
         self.declare_parameter('cmd_rate', 10.0)
@@ -289,7 +291,6 @@ class PositionController(Node):
 
         target_pos: UavPos = goal.request.target_pos
         result = GoToPos.Result()
-        feedback = GoToPos.Feedback()
 
         self.get_logger().info("Wait for uav initial position...")
         while (len(self.uav_pos.pos) == 0):
@@ -340,7 +341,10 @@ class PositionController(Node):
             result.message = 'Goal canceled'
 
         return result
-        
+
+    # HANDLE: Takeoff procedure
+    # Sends takeoff command and waits until UAV reaches target altitude
+    # Publishes feedback on current altitude and distance remaining    
     def _handle_takeoff(self, goal: ServerGoalHandle) -> GoToPos.Result:
         target_pos: UavPos = goal.request.target_pos
         target_altitude = target_pos.pos[2]
@@ -379,17 +383,22 @@ class PositionController(Node):
 
             if altitude_error <= self.pos_delta:
                 self.get_logger().info('Takeoff complete')
+                self.uav_airborn = True
                 result.success = True
                 result.message = 'Takeoff successful'
                 return result
 
             self.rate.sleep()
     
+    # HANDLE: Navigate to waypoint
     def _handle_waypoint(self, target_pos: UavPos) -> GoToPos.Result:
         self.get_logger().info(f'Navigating to waypoint at position {target_pos.pos} with yaw {target_pos.yaw}')
         # Implement waypoint navigation logic
         pass
 
+    # HANDLE: Landing procedure
+    # Sends land command and waits until UAV hits the ground
+    # Publishes feedback on current position and distance remaining
     def _handle_landing(self, goal: ServerGoalHandle) -> GoToPos.Result:
         self.get_logger().info('Initiating landing sequence')
         result = GoToPos.Result()
@@ -422,6 +431,7 @@ class PositionController(Node):
 
             if abs(current_altitude) <= self.pos_delta:
                 self.get_logger().info('Landing complete')
+                self.uav_airborn = False
                 result.success = True
                 result.message = 'Landing successful'
                 return result
