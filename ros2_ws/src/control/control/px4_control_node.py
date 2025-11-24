@@ -41,16 +41,17 @@ class PositionController(Node):
         self.uav_pos = UavPos()  # Current [x, y, z], yaw position of UAV
         self.take_off = False   # Flag: Has UAV reached takeoff altitude?
         self.offboard_enable = False  # Flag: Is offboard mode active?
+        self.auto_enable = False  # Flag: Is auto mode active?
         self.mission_state = None  # Current mission state
         self.last_command_ack = None  # Last command acknowledgement from PX4
         self.armed = False  # Flag: Are motors armed?
         self.action_in_progress = False  # Flag: Is an action currently being executed?
-        global offboard_signal_msg
-        offboard_signal_msg = OffboardControlMode()
+        self.offboard_signal_msg = OffboardControlMode()
 
-        self.declare_parameter('loop_rate', 10.0)
-        self.loop_freq = self.get_parameter('loop_rate').value
-        self.rate = self.create_rate(self.loop_freq)
+        # Parameters
+        self.declare_parameter('cmd_rate', 10.0)
+        self.cmd_freq = self.get_parameter('cmd_rate').value
+        self.rate = self.create_rate(self.cmd_freq)
 
         self.declare_parameter('offboard_rate', 5.0)
         self.offboard_rate = self.get_parameter('offboard_rate').value 
@@ -58,6 +59,7 @@ class PositionController(Node):
         self.declare_parameter('pos_delta', 0.3)
         self.pos_delta = self.get_parameter('pos_delta').value 
 
+        # ACTION SERVER - Handle incoming position goals
         self.action_server = ActionServer(
             self, 
             GoToPos,
@@ -66,9 +68,10 @@ class PositionController(Node):
             cancel_callback=self.cancel_pos_cb,
             execute_callback=self.excecute_pos_cb,
             callback_group=ReentrantCallbackGroup())
-        
         self.get_logger().info('Action server started')
 
+        # TIMERS - Periodic callbacks
+        # Maintain offboard control mode by sending signal and hold position at a fixed rate
         self.maintain_offboard_timer = self.create_timer(1/self.offboard_rate, self.maintain_offboard_cb)
         self.get_logger().info('Offboard maintainer started')
 
@@ -144,21 +147,35 @@ class PositionController(Node):
         )
         self.get_logger().info('Trajectory pub created')
 
-    def send_offboard_signal(self):
-        offboard_signal_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        self.offboard_control_mode_publisher.publish(offboard_signal_msg)
+    def _set_cmd_system(self, cmd_msg: VehicleCommand) -> VehicleCommand:
+        cmd_msg.target_system = 1
+        cmd_msg.target_component = 1
+        cmd_msg.source_system = 1
+        cmd_msg.source_component = 1
+        cmd_msg.from_external = True
+        return cmd_msg  
 
-    def enter_offboard_mode(self):
+    def send_offboard_signal(self) -> None:
+        self.offboard_signal_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        self.offboard_control_mode_publisher.publish(self.offboard_signal_msg)
+
+    def enter_offboard_mode(self) -> None:
         # Create offboard control mode message
         # This tells PX4 we want to control POSITION (not velocity/attitude/etc)
         self.get_logger().info('Going into OFFBOARD mode') 
-        offboard_signal_msg.position = True  # We'll send position setpoints
-        offboard_signal_msg.velocity = False
-        offboard_signal_msg.acceleration = False
-        offboard_signal_msg.attitude = False
-        offboard_signal_msg.body_rate = False
+        self.offboard_signal_msg.position = True  # We'll send position setpoints
+        self.offboard_signal_msg.velocity = False
+        self.offboard_signal_msg.acceleration = False
+        self.offboard_signal_msg.attitude = False
+        self.offboard_signal_msg.body_rate = False
 
         self.send_offboard_signal()
+
+        cmd_msg = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
+        cmd_msg.param1 = 1.0  # Custom mode enabled
+        cmd_msg.param2 = 6.0  # Offboard mode (PX4_CUSTOM_MAIN_MODE_OFFBOARD)
+        cmd_msg = self._set_cmd_system(cmd_msg)
 
         itr = 0
 
@@ -166,10 +183,6 @@ class PositionController(Node):
             self.get_logger().info('Requesting OFFBOARD mode')
             # Wait a bit before requesting (let offboard signal propagate)
             if(itr > 10):
-                cmd_msg = VehicleCommand()
-                cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
-                cmd_msg.param1 = 1.0  # Custom mode enabled
-                cmd_msg.param2 = 6.0  # Offboard mode (PX4_CUSTOM_MAIN_MODE_OFFBOARD)
                 cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.vehicle_command_publisher.publish(cmd_msg)
             itr = itr + 1 
@@ -177,7 +190,24 @@ class PositionController(Node):
 
         self.get_logger().info('OFFBOARD mode enabled')
 
-    def arm_uav(self):
+    def enter_auto_mode(self) -> None:
+        self.get_logger().info('Going into AUTO mode') 
+
+        cmd_msg = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
+        cmd_msg.param1 = 1.0  # Custom mode enabled
+        cmd_msg.param2 = 4.0  # Auto mode (PX4_CUSTOM_MAIN_MODE_AUTO)
+        cmd_msg = self._set_cmd_system(cmd_msg)
+
+        while(self.auto_enable == False):
+            self.get_logger().info('Requesting AUTO mode')
+            cmd_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.vehicle_command_publisher.publish(cmd_msg)
+            self.rate.sleep()
+
+        self.get_logger().info('AUTO mode enabled')
+        
+    def arm_uav(self) -> None:
         self.get_logger().info('Arming UAV')
         cmd_msg = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
@@ -200,7 +230,7 @@ class PositionController(Node):
         else:
             self.get_logger().error('Failed to arm! Check PX4 console')
 
-    def disarm_uav(self):
+    def disarm_uav(self) -> None:
         self.get_logger().info('Disarming UAV')
         cmd_msg = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
@@ -225,7 +255,7 @@ class PositionController(Node):
 
     # Every new received goal will be processed here first
     # We can decide to accept or reject the incoming goal
-    def goal_pos_cb(self, goal_request: GoToPos.Goal):
+    def goal_pos_cb(self, goal_request: GoToPos.Goal) -> GoalResponse:
         self.get_logger().info('Position goal received')
 
         new_pos: UavPos = goal_request.target_pos
@@ -245,7 +275,7 @@ class PositionController(Node):
         return GoalResponse.ACCEPT 
 
     # Any cancel request will be processed here, we can accept or reject it
-    def cancel_pos_cb(self, goal_handle: ServerGoalHandle):
+    def cancel_pos_cb(self, goal_handle: ServerGoalHandle) -> CancelResponse:
         self.get_logger().info('Received cancel request')
         # put in hover or land mode
         return CancelResponse.ACCEPT
@@ -272,11 +302,8 @@ class PositionController(Node):
                     self.enter_offboard_mode()
 
             if self.mission_state == MissionState.MISSION_STATE_TYPE_MODE_CONTROL:
-                if (self.offboard_enable == True):
-                    self.get_logger().info("Disabling OFFBOARD mode")
-                    offboard_signal_msg.position = False
-                    self.send_offboard_signal()
-                    self.offboard_enable = False
+                if (self.auto_enable == False):
+                    self.enter_auto_mode()
 
             if (self.armed == False):
                 self.arm_uav()
@@ -284,6 +311,11 @@ class PositionController(Node):
             self.get_logger().info(f'Executing Goal of type: {self.pos_types_int_to_str.get(target_pos.type)}')
             
             while rclpy.ok():
+                result = self._handle_cancellation(goal)
+                
+                if result.success == False:
+                    return result
+                
                 if target_pos.type == UavPos.UAV_POS_TYPE_TAKEOFF:
                     result = self._handle_takeoff(goal)
                 elif target_pos.type == UavPos.UAV_POS_TYPE_WAYPOINT:   
@@ -365,6 +397,7 @@ class PositionController(Node):
 
         msg = VehicleCommand()
         msg.command = VehicleCommand.VEHICLE_CMD_NAV_LAND
+
         while rclpy.ok() and (self.last_command_ack is None or
               self.last_command_ack.command != VehicleCommand.VEHICLE_CMD_NAV_LAND or
               self.last_command_ack.result != VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED):
@@ -412,7 +445,6 @@ class PositionController(Node):
     def command_ack_cb(self, ack_msg):
         if ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED:
             self.get_logger().info(f'Command {ack_msg.command} acknowledged: ACCEPTED')
-            self.last_command_ack = ack_msg
         elif ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED:
             self.get_logger().warn(f'Command {ack_msg.command} acknowledged: TEMPORARILY REJECTED')
         elif ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_DENIED:
@@ -422,7 +454,8 @@ class PositionController(Node):
         elif ack_msg.result == VehicleCommandAck.VEHICLE_CMD_RESULT_FAILED:
             self.get_logger().error(f'Command {ack_msg.command} acknowledged: FAILED')
 
-    
+        self.last_command_ack = ack_msg
+
     # CALLBACK: Update mission state
     def mission_state_cb(self, state_msg):
         self.mission_state = state_msg.state
@@ -436,6 +469,7 @@ class PositionController(Node):
     # CALLBACK: Update offboard mode status
     def vehicle_control_mode_cb(self, mode):
         self.offboard_enable = mode.flag_control_offboard_enabled
+        self.auto_enable = mode.flag_control_auto_enabled
 
     # CALLBACK: Update current position
     def vehicle_local_position_cb(self, local_pos):
