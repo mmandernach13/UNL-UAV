@@ -61,6 +61,9 @@ class PositionController(Node):
         self.declare_parameter('pos_delta', 0.3)
         self.pos_delta = self.get_parameter('pos_delta').value 
 
+        self.declare_parameter('home_coords', [0.0, 0.0])
+        self.home_coords = self.get_parameter('home_coords').value
+
         # ACTION SERVER - Handle incoming position goals
         self.action_server = ActionServer(
             self, 
@@ -157,9 +160,33 @@ class PositionController(Node):
         cmd_msg.from_external = True
         return cmd_msg  
 
+    def _initialize_drone(self) -> None:
+        cmd_msg = VehicleCommand()
+        cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_HOME
+
+        if self.home_coords == [0.0, 0.0]:
+            cmd_msg.param1 = 1
+        else:
+            cmd_msg.param1 = 0
+            cmd_msg.param5 = self.home_coords[0] # latitude 
+            cmd_msg.param6 = self.home_coords[1] # longitude
+            cmd_msg.param7 = 0
+        
+        while rclpy.ok() and (self.last_command_ack is None or
+              self.last_command_ack.result != VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED):
+            self.get_logger().info(f'Setting home to: {self.home_coords[0]}, {self.home_coords[1]}')
+
+            cmd_msg.timestamp = self.get_clock().now().nanoseconds // 1000
+            self.vehicle_command_publisher.publish(cmd_msg)
+            self.rate.sleep()
+
+        self.get_logger().info('Home location set')
+
+
     def send_offboard_signal(self) -> None:
         self.offboard_signal_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_control_mode_publisher.publish(self.offboard_signal_msg)
+
 
     def enter_offboard_mode(self) -> None:
         # Create offboard control mode message
@@ -192,6 +219,7 @@ class PositionController(Node):
 
         self.get_logger().info('OFFBOARD mode enabled')
 
+
     def enter_auto_mode(self) -> None:
         self.get_logger().info('Going into AUTO mode') 
 
@@ -209,6 +237,7 @@ class PositionController(Node):
 
         self.get_logger().info('AUTO mode enabled')
         
+
     def arm_uav(self) -> None:
         self.get_logger().info('Arming UAV')
         cmd_msg = VehicleCommand()
@@ -231,6 +260,7 @@ class PositionController(Node):
             self.get_logger().info('UAV armed')
         else:
             self.get_logger().error('Failed to arm! Check PX4 console')
+
 
     def disarm_uav(self) -> None:
         self.get_logger().info('Disarming UAV')
@@ -255,6 +285,7 @@ class PositionController(Node):
         else:
             self.get_logger().error('Failed to disarm! Check PX4 console')
 
+
     # Every new received goal will be processed here first
     # We can decide to accept or reject the incoming goal
     def goal_pos_cb(self, goal_request: GoToPos.Goal) -> GoalResponse:
@@ -276,11 +307,13 @@ class PositionController(Node):
         self.get_logger().info(f'ACCEPT goal for UavPos: {new_pos.pos}')
         return GoalResponse.ACCEPT 
 
+
     # Any cancel request will be processed here, we can accept or reject it
     def cancel_pos_cb(self, goal_handle: ServerGoalHandle) -> CancelResponse:
         self.get_logger().info('Received cancel request')
         # put in hover or land mode
         return CancelResponse.ACCEPT
+
 
     # If a goal has been accepted, it will then be executed in this callback
     # After we are done with the goal execution we set a final state and return the result
@@ -343,6 +376,7 @@ class PositionController(Node):
 
         return result
 
+
     # HANDLE: Takeoff procedure
     # Sends takeoff command and waits until UAV reaches target altitude
     # Publishes feedback on current altitude and distance remaining    
@@ -390,12 +424,14 @@ class PositionController(Node):
                 return result
 
             self.rate.sleep()
-    
+
+
     # HANDLE: Navigate to waypoint
     def _handle_waypoint(self, target_pos: UavPos) -> GoToPos.Result:
         self.get_logger().info(f'Navigating to waypoint at position {target_pos.pos} with yaw {target_pos.yaw}')
         # Implement waypoint navigation logic
         pass
+
 
     # HANDLE: Landing procedure
     # Sends land command and waits until UAV hits the ground
@@ -439,6 +475,7 @@ class PositionController(Node):
 
             self.rate.sleep()
 
+
     # CALLBACK: maintains offboard control (have to publish at >2Hz)
     def maintain_offboard_cb(self):
         if self.offboard_enable:
@@ -451,6 +488,7 @@ class PositionController(Node):
                 msg.yaw = 0.0
                 msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
                 self.trajectory_setpoint_publisher.publish(msg)
+
 
     # CALLBACK: Process command acknowledgements from PX4
     def command_ack_cb(self, ack_msg):
@@ -467,26 +505,31 @@ class PositionController(Node):
 
         self.last_command_ack = ack_msg
 
+
     # CALLBACK: Update mission state
     def mission_state_cb(self, state_msg):
         self.mission_state = state_msg.state
         self.get_logger().info(f"Mission state updated to: {self.mission_states_int_to_str.get(self.mission_state)}")
 
+
     # CALLBACK: Update armed status from vehicle status
     def status_cb(self, status):
         # arming_state == 2 means ARMED
         self.armed = True if status.arming_state == 2 else False
-        
+
+
     # CALLBACK: Update offboard mode status
     def vehicle_control_mode_cb(self, mode):
         self.offboard_enable = mode.flag_control_offboard_enabled
         self.auto_enable = mode.flag_control_auto_enabled
+
 
     # CALLBACK: Update current position
     def vehicle_local_position_cb(self, local_pos):
         # Store position in NED frame (North, East, Down)
         self.uav_pos.pos = [local_pos.x, local_pos.y, local_pos.z]
         self.uav_pos.stamp = local_pos.timestamp
+
 
     def distance_2d(self, pos1, pos2):
         x1, y1, _ = pos1[0], pos1[1], pos1[2]
@@ -496,6 +539,7 @@ class PositionController(Node):
         dy = y2 - y1
         
         return math.sqrt(dx*dx + dy*dy)
+
 
     def distance_3d(self, pos1, pos2):
         x1, y1, z1 = pos1[0], pos1[1], pos1[2]
