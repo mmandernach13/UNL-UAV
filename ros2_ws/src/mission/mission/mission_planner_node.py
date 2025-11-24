@@ -53,16 +53,17 @@ class MissionPlannerClientNode(Node):
             '/mission/state',
             qos_profile
         )
+        self.get_logger().info('Mission state pub has been created')
         
         self.mission_dir = os.getcwd() + "/src/mission/mission_files/"
     
-    def publish_mission_state(self):
+    def publish_mission_state(self) -> None:
         msg = MissionState()
         msg.state = self.mission_state
         self.mission_state_pub.publish(msg)
         self.get_logger().info(f"Published mission state: {self.mission_states_int_to_str.get(self.mission_state)}")
 
-    def send_goal(self, target_pos: UavPos):
+    def send_goal(self, target_pos: UavPos) -> None:
         self.mission_planner_client.wait_for_server()
         goal = GoToPos.Goal()
         goal.target_pos = target_pos
@@ -70,11 +71,11 @@ class MissionPlannerClientNode(Node):
             goal, feedback_callback=self.goal_feedback_callback). \
             add_done_callback(self.goal_response_callback)
 
-    def cancel_goal(self):
+    def cancel_goal(self) -> None:
         self.get_logger().info("Send a cancel goal request")
         self.goal_handle_.cancel_goal_async()
 
-    def goal_response_callback(self, future):
+    def goal_response_callback(self, future) -> None:
         self.goal_handle_: ClientGoalHandle = future.result()
         if self.goal_handle_.accepted:
             self.get_logger().info("Goal got accepted")
@@ -82,7 +83,7 @@ class MissionPlannerClientNode(Node):
         else:
             self.get_logger().info("Goal got rejected")
 
-    def goal_result_callback(self, future):
+    def goal_result_callback(self, future) -> None:
         status = future.result().status
         result = future.result().result
         if status == GoalStatus.STATUS_SUCCEEDED:
@@ -95,11 +96,11 @@ class MissionPlannerClientNode(Node):
             self.get_logger().warn("Canceled")
         self.get_logger().info("Result: " + str(result.message))
 
-    def goal_feedback_callback(self, feedback_msg):
+    def goal_feedback_callback(self, feedback_msg) -> None:
         feedback = feedback_msg.feedback
         self.get_logger().info("Got feedback: " + str(feedback.distance_remaining))
 
-    def read_mission_file(self, filepath: str = "ex_mission.csv"):
+    def read_mission_file(self, filepath: str = "ex_mission.csv") -> list[tuple[int, UavPos]]:
         mission_points = []
         with open(filepath, 'r') as csvfile:
             csvreader = csv.reader(csvfile)
@@ -116,7 +117,7 @@ class MissionPlannerClientNode(Node):
                 mission_points.append((state, point))
         return mission_points
         
-    def run_mission(self, filename: str = "ex_mission.csv"):
+    def run_mission(self, filename: str = "ex_mission.csv") -> None:
         global idx
         idx = 0
         mission_filepath = os.path.join(self.mission_dir, filename)
@@ -132,7 +133,6 @@ class MissionPlannerClientNode(Node):
             self.send_goal(point)
             rclpy.spin_once(self)
             idx += 1
-
 
 def main(args=None):
     rclpy.init(args=args)
