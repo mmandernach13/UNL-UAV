@@ -312,7 +312,7 @@ class PositionController(Node):
             self.get_logger().info(f'Executing Goal of type: {self.pos_types_int_to_str.get(target_pos.type)}')
             
             while rclpy.ok():
-                result = self._handle_cancellation(goal)
+                result = self._check_for_cancellation(goal)
 
                 if result.success == False:
                     return result
@@ -331,7 +331,8 @@ class PositionController(Node):
         finally:
             self.action_in_progress = False
 
-    def _handle_cancellation(self, goal: ServerGoalHandle) -> GoToPos.Result:
+
+    def _check_for_cancellation(self, goal: ServerGoalHandle) -> GoToPos.Result:
         result = GoToPos.Result()
 
         if goal.is_cancel_requested:
@@ -371,7 +372,7 @@ class PositionController(Node):
 
         # Wait until UAV reaches target altitude
         while rclpy.ok():
-            result = self._handle_cancellation(goal)
+            result = self._check_for_cancellation(goal)
 
             current_altitude = self.uav_pos.pos[2]
             altitude_error = abs(current_altitude - target_altitude)
@@ -420,7 +421,7 @@ class PositionController(Node):
 
         # Wait until UAV lands (altitude near zero)
         while rclpy.ok():
-            result = self._handle_cancellation(goal)
+            result = self._check_for_cancellation(goal)
 
             current_altitude = self.uav_pos.pos[2]
             self.get_logger().info(f'Current altitude: {-current_altitude} m')
@@ -513,7 +514,6 @@ def main(args=None):
     node = PositionController()
     rclpy.spin(node, MultiThreadedExecutor()) 
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
