@@ -225,8 +225,9 @@ class PositionController(Node):
 
         cmd_msg = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
-        cmd_msg.param1 = 1.0  # Custom mode enabled
-        cmd_msg.param2 = 4.0  # Auto mode (PX4_CUSTOM_MAIN_MODE_AUTO)
+        cmd_msg.param1 = 1  # Custom mode enabled
+        cmd_msg.param2 = 4  # Auto mode (PX4_CUSTOM_MAIN_MODE_AUTO)
+        cmd_msg.param3 = 1  # sub mode auto ready
         cmd_msg = self._set_cmd_system(cmd_msg)
 
         while(self.auto_enable == False):
@@ -550,6 +551,7 @@ class PositionController(Node):
         dz = z2 - z1
         
         return math.sqrt(dx*dx + dy*dy + dz*dz)
+
 
 def main(args=None):
     print('Starting UAV Control program...')
