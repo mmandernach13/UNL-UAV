@@ -136,15 +136,17 @@ class MissionPlannerClientNode(Node):
         mission_points = self.read_mission_file(mission_filepath)
         total_points = len(mission_points)
 
+        itr = 0 
+
         while rclpy.ok() and idx < total_points:
-            state, point = mission_points[idx]
-            self.mission_state = state
-            self.publish_mission_state()
-            self.get_logger().info(f"Sending goal {idx + 1}/{total_points}: State={self.mission_states_int_to_str.get(state)}, \
-                                   Pos=({point.pos[0]}, {point.pos[1]}, {point.pos[2]}), Yaw={point.yaw}, Type={self.pos_types_str_to_int.get(type)}")
-            self.send_goal(point)
-            rclpy.spin_once(self)
-            idx += 1
+            if itr == idx:  # itr and idx will be equal first loop, then idx will also be incremented after goal success
+                state, point = mission_points[idx]
+                self.mission_state = state
+                self.publish_mission_state()
+                self.get_logger().info(f"Sending goal {idx + 1}/{total_points}: State={self.mission_states_int_to_str.get(state)}, \
+                                    Pos=({point.pos[0]}, {point.pos[1]}, {point.pos[2]}), Yaw={point.yaw}, Type={self.pos_types_str_to_int.get(type)}")
+                self.send_goal(point)
+                itr += 1
 
 def main(args=None):
     rclpy.init(args=args)

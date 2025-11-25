@@ -12,7 +12,7 @@ from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand
                         VehicleCommandAck, VehicleLocalPosition, VehicleStatus, VehicleControlMode
 from uav_interfaces.msg import UavPos, MissionState
 from uav_interfaces.action import GoToPos
-from mission.mission.mission_planner_node import MissionPlannerClientNode
+from mission.mission_planner_node import MissionPlannerClientNode
 import math
 
 
