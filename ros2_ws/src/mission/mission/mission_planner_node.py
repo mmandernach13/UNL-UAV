@@ -80,7 +80,7 @@ class MissionPlannerClientNode(Node):
 
     # get the response if the goal is accepted 
     def goal_response_callback(self, future) -> None:
-        self.goal_handle_: ClientGoalHandle = future.result()
+        self.goal_handle_ = future.result()
         if self.goal_handle_.accepted:
             self.get_logger().info("Goal got accepted")
             self.goal_handle_.get_result_async().add_done_callback(self.goal_result_callback)

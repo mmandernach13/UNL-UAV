@@ -152,6 +152,8 @@ class PositionController(Node):
         )
         self.get_logger().info('Trajectory pub created')
 
+        self._initialize_drone()
+
     def _set_cmd_system(self, cmd_msg: VehicleCommand) -> VehicleCommand:
         cmd_msg.target_system = 1
         cmd_msg.target_component = 1
@@ -170,7 +172,7 @@ class PositionController(Node):
             cmd_msg.param1 = 0
             cmd_msg.param5 = self.home_coords[0] # latitude 
             cmd_msg.param6 = self.home_coords[1] # longitude
-            cmd_msg.param7 = 0
+            cmd_msg.param7 = 0                   # altitude
         
         while rclpy.ok() and (self.last_command_ack is None or
               self.last_command_ack.result != VehicleCommandAck.VEHICLE_CMD_RESULT_ACCEPTED):
@@ -220,15 +222,24 @@ class PositionController(Node):
         self.get_logger().info('OFFBOARD mode enabled')
 
 
-    def enter_auto_mode(self) -> None:
+    def enter_auto_mode(self, sub_mode: int = -1) -> None:
         self.get_logger().info('Going into AUTO mode') 
 
         cmd_msg = VehicleCommand()
         cmd_msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
         cmd_msg.param1 = 1  # Custom mode enabled
         cmd_msg.param2 = 4  # Auto mode (PX4_CUSTOM_MAIN_MODE_AUTO)
-        cmd_msg.param3 = 1  # sub mode auto ready
         cmd_msg = self._set_cmd_system(cmd_msg)
+
+        if sub_mode == UavPos.UAV_POS_TYPE_TAKEOFF:
+            cmd_msg.param3 = 2
+        elif sub_mode == UavPos.UAV_POS_TYPE_WAYPOINT:
+            cmd_msg.param3 = 4
+        elif sub_mode == UavPos.UAV_POS_TYPE_LAND:
+            cmd_msg.param3 = 6
+        else:
+            cmd_msg.param3 = 1
+
 
         while(self.auto_enable == False):
             self.get_logger().info('Requesting AUTO mode')
